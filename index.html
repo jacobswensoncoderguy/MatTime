@@ -512,7 +512,7 @@ window.MT_DB=(function(){
   // config/current = {id}. The app writes the running summary once a minute; a new meet's prior is the average of all summaries.
   let meetsIdx={}; let lastSummary=0;
   function meetDoc(){ return {...(meetsIdx[MEET.id]||{}),id:MEET.id,title:MEET.title,start:MEET.start,mats:MATS,track:MEET.track,startWt:MEET.startWt||null,startAt:MEET.startAt||null,work:MEET.work||null,prior:MEET.prior||null,summary:(meetsIdx[MEET.id]||{}).summary||null,updatedAtMs:Date.now()}; }
-  function saveMeetDoc(){ if(window.MT_DB&&window.MT_NEEDPIN&&!window.MT_NEEDPIN()){ toast('View only: PIN needed to make changes'); return; } const d=meetDoc(); meetsIdx[MEET.id]=d; try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){} if(db) db.collection('meets').doc(MEET.id).set(d).catch(()=>{}); }
+  function saveMeetDoc(){ if(window.MT_DB&&window.MT_NEEDPIN&&!window.MT_NEEDPIN()){ toast('View only: PIN needed to make changes'); return; } const d=meetDoc(); d.updatedAtMs=Date.now(); meetsIdx[MEET.id]=d; try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){} if(db) db.collection('meets').doc(MEET.id).set(d).catch(()=>{}); }
   function statsAll(m){ // whole-meet version of stats(): every timed bout on the mat
     const rows=onMat(m); let d=[],g=[];
     rows.forEach((r,k)=>{ const x=r.x; if(x.start!=null&&x.end!=null&&x.end>=x.start&&x.end-x.start<15) d.push(x.end-x.start);
@@ -766,6 +766,17 @@ window.MT_DB=(function(){
 
   let unsub=null;
   function subscribe(){ if(!db) return; try{ floSubscribe(); }catch(e){} try{ if(unsub) unsub(); }catch(e){} try{ unsub=db.collection(BOUTS()).onSnapshot(snap=>{ mergeSnap(snap); try{ applyFlo(); }catch(e){} if(!$('modal').classList.contains('open')) renderAll(); else project(); $('status').textContent='Live · '+(MEET.title||MEET.id)+' · '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'}); },err=>{ $('status').textContent='Sync error: '+(err.code||err.message); }); }catch(e){ $('status').textContent='Sync unavailable: '+(e.code||e.message); } }
+  // Pick up roster / start weight / Flo link changes made elsewhere without a reload.
+  async function meetSync(){ if(!db||$('modal').classList.contains('open')) return;
+    try{ const sn=await db.collection('meets').doc(MEET.id).get(); if(!sn||sn.exists===false) return; const x=sn.data(); if(!x||!x.mats) return;
+      const old=meetsIdx[MEET.id]||{}; if((x.updatedAtMs||0)<=(old.updatedAtMs||0)) return;
+      const floChanged=JSON.stringify(x.flo||[])!==JSON.stringify(old.flo||[]); meetsIdx[MEET.id]=x;
+      MEET={id:MEET.id,title:x.title,start:x.start,track:x.track,prior:x.prior||null,startWt:x.startWt||null,startAt:x.startAt||null,work:x.work||null};
+      if(JSON.stringify(x.mats)!==JSON.stringify(MATS)) MATS=x.mats;
+      try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){}
+      buildRoster(); if(floChanged){ try{ floSubscribe(); }catch(e){} } try{ floRoster(); }catch(e){} try{ applyFlo(); }catch(e){} renderAll(); toast('Meet updated');
+    }catch(e){} }
+  setInterval(meetSync,20000);
   buildRoster(); loadLocal(); renderAll();
   (async()=>{
     db=window.MT_DB||await window.claude?.use?.('db');
