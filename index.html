@@ -690,8 +690,8 @@ window.MT_DB=(function(){
     let changed=false;
     floIds().forEach((ev,q)=>{ const m='m'+(q+1); if(!MATS[m]) return;
       const typed=MATS[m].sections.some(x=>x.bouts.length)&&!MATS[m]._flo; if(typed) return;
-      const obs=Object.keys(floObs).map(id=>floObs[id]).filter(o=>o&&o.ev===ev&&o.a&&o.c); if(!obs.length) return;
-      const rows=obs.map(o=>{ const sw=/eagle/i.test(o.cTeam||'')&&!/eagle/i.test(o.aTeam||''); return {w:+o.wt||0,id:o.id,row:[(+o.wt||o.wt),sw?o.c:o.a,sw?o.a:o.c]}; }).sort((x,y)=>x.w-y.w||(x.id<y.id?-1:1));
+      const obs=Object.keys(floObs).map(id=>floObs[id]).filter(o=>o&&o.ev===ev&&(o.a||o.c)); if(!obs.length) return;
+      const rows=obs.map(o=>{ const sw=/eagle/i.test(o.cTeam||'')&&!/eagle/i.test(o.aTeam||''); return {w:+o.wt||0,id:o.id,row:[(+o.wt||o.wt),(sw?o.c:o.a)||'',(sw?o.a:o.c)||'']}; }).sort((x,y)=>x.w-y.w||(x.id<y.id?-1:1));
       const sig=JSON.stringify(rows.map(r=>r.row)); if(MATS[m]._sig===sig) return;
       MATS[m]={name:MATS[m].name,sections:[{label:((obs[0].lvl||'Flo')+' · from Flo'),bouts:rows.map(r=>r.row)}],_flo:true,_sig:sig}; changed=true; });
     if(changed){ try{ buildRoster(); }catch(e){} }
@@ -701,7 +701,7 @@ window.MT_DB=(function(){
     Object.keys(state).forEach(k=>{ if(state[k]&&state[k].auto) delete state[k]; });
     const obs=Object.keys(floObs).map(id=>floObs[id]).filter(o=>o&&(o.endMs||o.liveMs)).sort((x,y)=>(x.endMs||x.liveMs)-(y.endMs||y.liveMs));
     let fin=0, miss=0; const pr=(MEET.prior&&MEET.prior.all)||{dur:2.5};
-    for(const o of obs){ const isFin=!!o.endMs; if(isFin) fin++;
+    for(const o of obs){ const isFin=!!o.endMs; if(isFin) fin++; if(!o.a||!o.c) continue;
       const both=b=>(sameName(b[1],o.a)&&sameName(b[2],o.c))||(sameName(b[1],o.c)&&sameName(b[2],o.a));
       const tests=[b=>String(b[0])===String(o.wt)&&both(b), b=>both(b), b=>String(b[0])===String(o.wt)&&(sameName(b[1],o.a)||sameName(b[2],o.c)||sameName(b[1],o.c)||sameName(b[2],o.a))];
       let hit=null, already=false;
