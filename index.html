@@ -204,7 +204,7 @@ window.MT_DB=(function(){
         function tick(){ if(stop) return;
           list().then(function(sn){ var sig=JSON.stringify(sn.docs.map(function(d){return [d.id,d.data()];})); if(sig!==last){ last=sig; cb(sn); } })
             .catch(function(e){ if(err) err(e); })
-            .then(function(){ if(!stop) setTimeout(tick,4000); }); }
+            .then(function(){ if(!stop) setTimeout(tick,3000); }); }
         tick(); return function(){ stop=true; };
       }
     };
@@ -760,7 +760,7 @@ window.MT_DB=(function(){
     floBusy=false;
   }
   window.MT_FLOSYNC=floSync;
-  setInterval(floSync,20000); setTimeout(floSync,4000);
+  setInterval(floSync,5000); setTimeout(floSync,2000);
   setInterval(()=>{ if(!$('modal').classList.contains('open')) renderAll(); },20000);
 
   let unsub=null;
