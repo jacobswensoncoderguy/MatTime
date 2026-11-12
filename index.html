@@ -292,7 +292,7 @@ window.MT_DB=(function(){
   // The one write path. Everything that changes a bout goes through here, and everything re-renders after it.
   function commit(k,patch,msg){
     if(window.MT_DB&&window.MT_NEEDPIN&&!window.MT_NEEDPIN()){ toast('View only: PIN needed to make changes'); return; }
-    const cur={...(state[k]||{}),...patch,updatedAtMs:Date.now()};
+    const cur={...((state[k]&&state[k].auto)?{}:(state[k]||{})),...patch,updatedAtMs:Date.now()};
     Object.keys(cur).forEach(f=>{ if(cur[f]===null||cur[f]===undefined) delete cur[f]; });
     state[k]=cur; mirror(); queue[k]=1; flush(); renderAll(); if(msg) toast(msg);
   }
@@ -680,44 +680,74 @@ window.MT_DB=(function(){
   const nmz=t=>String(t||'').toLowerCase().replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
   const lev=(a,b)=>{ const d=[]; for(let i=0;i<=a.length;i++) d[i]=[i]; for(let j=1;j<=b.length;j++) d[0][j]=j; for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++) d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return d[a.length][b.length]; };
   const sameName=(a,b)=>{ a=nmz(a); b=nmz(b); if(!a||!b) return false; if(a===b) return true; const la=a.split(' ').pop(), lb=b.split(' ').pop(); return lev(a,b)<=3||(a[0]===b[0]&&lev(la,lb)<=1); };
-  let floBusy=false;
+  let floBusy=false, floObs={}, floUnsub=null;
   const floNote=t=>{ const el=$('status'); if(el){ if(t) el.dataset.flo=t; else delete el.dataset.flo; } };
+  const FLOC=()=>'meets/'+MEET.id+'/flo';
+  const floIds=()=>window.MT_FLO_TEST||((meetsIdx[MEET.id]||{}).flo)||[];
+  const msToMin=ms=>{ const d=new Date(ms); return d.getHours()*60+d.getMinutes()+d.getSeconds()/60; };
+  // Sheets nobody typed are built from Flo's bout list (weight order, Eagle on the left). Nothing is saved; every phone derives the same list.
+  function floRoster(){
+    let changed=false;
+    floIds().forEach((ev,q)=>{ const m='m'+(q+1); if(!MATS[m]) return;
+      const typed=MATS[m].sections.some(x=>x.bouts.length)&&!MATS[m]._flo; if(typed) return;
+      const obs=Object.keys(floObs).map(id=>floObs[id]).filter(o=>o&&o.ev===ev&&o.a&&o.c); if(!obs.length) return;
+      const rows=obs.map(o=>{ const sw=/eagle/i.test(o.cTeam||'')&&!/eagle/i.test(o.aTeam||''); return {w:+o.wt||0,id:o.id,row:[(+o.wt||o.wt),sw?o.c:o.a,sw?o.a:o.c]}; }).sort((x,y)=>x.w-y.w||(x.id<y.id?-1:1));
+      const sig=JSON.stringify(rows.map(r=>r.row)); if(MATS[m]._sig===sig) return;
+      MATS[m]={name:MATS[m].name,sections:[{label:((obs[0].lvl||'Flo')+' · from Flo'),bouts:rows.map(r=>r.row)}],_flo:true,_sig:sig}; changed=true; });
+    if(changed){ try{ buildRoster(); }catch(e){} }
+  }
+  // Flo observations (stamped by the server job) become bout times in memory. Rows a person timed are never touched.
+  function applyFlo(){
+    Object.keys(state).forEach(k=>{ if(state[k]&&state[k].auto) delete state[k]; });
+    const obs=Object.keys(floObs).map(id=>floObs[id]).filter(o=>o&&(o.endMs||o.liveMs)).sort((x,y)=>(x.endMs||x.liveMs)-(y.endMs||y.liveMs));
+    let fin=0, miss=0; const pr=(MEET.prior&&MEET.prior.all)||{dur:2.5};
+    for(const o of obs){ const isFin=!!o.endMs; if(isFin) fin++;
+      const both=b=>(sameName(b[1],o.a)&&sameName(b[2],o.c))||(sameName(b[1],o.c)&&sameName(b[2],o.a));
+      const tests=[b=>String(b[0])===String(o.wt)&&both(b), b=>both(b), b=>String(b[0])===String(o.wt)&&(sameName(b[1],o.a)||sameName(b[2],o.c)||sameName(b[1],o.c)||sameName(b[2],o.a))];
+      let hit=null, already=false;
+      for(let t=0;t<tests.length&&!hit&&!already;t++){
+        for(const m of MIDS()){ const bs=flat(m), ord=order(m);
+          for(const i of ord){ const b=bs[i]; if(!b||!b[1]||!b[2]||!tests[t](b)) continue; const x=state[key(m,i)]; if(x&&(x.start!=null||x.end!=null||x.forfeit===true||x.auto)){ if(t<2) already=true; continue; } hit={m,i,b}; break; }
+          if(hit||already) break; } }
+      if(!hit){ if(!already&&isFin) miss++; continue; }
+      const k=key(hit.m,hit.i), wt=String(o.winType||'').toUpperCase();
+      if(!isFin){ state[k]={start:msToMin(o.liveMs),flo:'live',auto:true}; continue; }
+      const win=sameName(hit.b[1],o.aWin?o.a:o.c)?'ems':'lhms', end=msToMin(o.endMs);
+      if(/^(FF|FOR|M ?FOR|DQ|NC|BYE)/.test(wt)){ state[k]={forfeit:true,flo:wt,winner:win,auto:true}; continue; }
+      let lastEnd=null; flat(hit.m).forEach((b,j)=>{ const y=state[key(hit.m,j)]||{}; if(y.end!=null&&y.end<=end) lastEnd=Math.max(lastEnd??-1,y.end); });
+      const est=/^F/.test(wt)?Math.min(pr.dur||2.5,3):/^(SV|OT|TB|UTB)/.test(wt)?5.5:4.5;
+      const st0=(o.liveMs&&o.liveMs<o.endMs)?msToMin(o.liveMs):Math.min(end,Math.max(lastEnd??-1,end-est));
+      state[k]={start:st0,end:end,flo:wt||'done',winner:win,auto:true};
+    }
+    const n=Object.keys(floObs).length;
+    floNote(n?('Flo: '+n+' bouts listed · '+fin+' finished'+(miss?' · '+miss+' not on a sheet':'')):(floIds().length?'Flo: nothing posted yet':''));
+  }
+  function onFlo(){ floRoster(); applyFlo(); if(!$('modal').classList.contains('open')) renderAll(); else project(); }
+  function floSubscribe(){ try{ if(floUnsub) floUnsub(); }catch(e){} floUnsub=null; floObs={}; if(!db||!floIds().length) return;
+    try{ floUnsub=db.collection(FLOC()).onSnapshot(snap=>{ const o={}; snap.docs.forEach(d=>{ o[d.id]=Object.assign({id:d.id},d.data()||{}); }); floObs=o; onFlo(); },()=>{}); }catch(e){} }
+  // Fallback only: if the server job has not checked in for 90 s, an unlocked phone records what Flo shows.
   async function floSync(){
-    const ids=window.MT_FLO_TEST||((meetsIdx[MEET.id]||{}).flo)||[];
-    if(!ids.length||floBusy||MEET.id!==todayId()) return;
-    if(window.MT_DB&&!(window.MT_HASPIN&&window.MT_HASPIN())) return;   // only unlocked phones mark bouts
+    const ids=floIds(); if(!ids.length||floBusy||MEET.id!==todayId()) return;
+    if(db&&!(window.MT_HASPIN&&window.MT_HASPIN())) return;
     floBusy=true;
-    try{ let seen=0, marked=0, miss=0;
+    try{
+      if(db){ const hb=await db.collection('config').doc('flopoll').get(); const d=hb.exists?hb.data():null; if(d&&Date.now()-(d.ms||0)<90000){ floBusy=false; return; } }
       for(const ev of ids){
         const ws=await (await fetch(FLO+ev+'/results/rounds/event-weight-class?offset=0&limit=1000')).json();
         for(const w of (ws.data||[])){
           const gf=encodeURIComponent(JSON.stringify({id:'event-weight-class',type:'string',value:w.id}));
           const r=await (await fetch(FLO+ev+'/results/rounds/event-weight-class/items?groupFilter='+gf)).json();
           for(const g of (r.data||[])) for(const rd of (g.items||[])) for(const fb of (rd.items||[])){
-            const a=fb.athlete1||{}, c=fb.athlete2||{};
-            const fin=!!(a.isWinner||c.isWinner); const liveNow=!fin&&((+a.score||0)+(+c.score||0)>0);
-            if(!fin&&!liveNow) continue; if(fin) seen++;
-            let hit=null, already=false;
-            const open_=(m,i)=>{ const x=state[key(m,i)]||{}; return !(x.end!=null||x.forfeit===true||(x.flo&&!fin)||(!fin&&x.start!=null)); };
-            const both=b=>(sameName(b[1],a.name)&&sameName(b[2],c.name))||(sameName(b[1],c.name)&&sameName(b[2],a.name));
-            const tests=[b=>String(b[0])===String(fb.weightClass)&&both(b), b=>both(b),
-                         b=>String(b[0])===String(fb.weightClass)&&(sameName(b[1],a.name)||sameName(b[2],c.name)||sameName(b[1],c.name)||sameName(b[2],a.name))];
-            for(let t=0;t<tests.length&&!hit&&!already;t++){
-              for(const m of MIDS()){ const bs=flat(m), ord=order(m);
-                for(const i of ord){ const b=bs[i]; if(!b||!b[1]||!b[2]||!tests[t](b)) continue; if(!open_(m,i)){ if(t<2) already=true; continue; } hit={m,i,b}; break; }
-                if(hit||already) break; } }
-            if(hit){ const k=key(hit.m,hit.i), x=state[k]||{}, now=nowMin(), wt=String(fb.winType||'').toUpperCase();
-              if(!fin){ commit(k,{start:now,flo:'live'}); }
-              else if(/^(FF|FOR|M ?FOR|DQ|NC|BYE)/.test(wt)){ commit(k,{forfeit:true,flo:wt||'FF',floAt:now,winner:sameName(hit.b[1],(a.isWinner?a:c).name)?'ems':'lhms'}); marked++; }
-              else { let lastEnd=null; flat(hit.m).forEach((b,j)=>{ const y=state[key(hit.m,j)]||{}; if(y.end!=null&&y.end<=now) lastEnd=Math.max(lastEnd??-1,y.end); });
-                const pr=(MEET.prior&&MEET.prior.all)||{dur:2.5}; const est=/^F/.test(wt)?Math.min(pr.dur||2.5,3):/^(SV|OT|TB|UTB)/.test(wt)?5.5:4.5;
-                const st0=x.start!=null&&x.start<=now?x.start:Math.min(now,Math.max(lastEnd??-1,now-est));
-                commit(k,{start:st0,end:now,flo:wt||'done',floAt:now,winner:sameName(hit.b[1],(a.isWinner?a:c).name)?'ems':'lhms'}); marked++; } }
-            else if(!already){ miss++; try{ console.log('[flo] no sheet row for',fb.weightClass,a.name,'vs',c.name); }catch(e){} }
+            const a=fb.athlete1||{}, c=fb.athlete2||{}; if(!fb.id) continue;
+            const fin=!!(a.isWinner||c.isWinner), live=!fin&&((+a.score||0)+(+c.score||0)>0), now=Date.now(), cur=floObs[fb.id]; let doc=null;
+            if(!cur) doc={ev:ev,lvl:'',wt:fb.weightClass,a:a.name||'',c:c.name||'',aTeam:(a.team||{}).name||'',cTeam:(c.team||{}).name||'',aWin:!!a.isWinner,winType:fb.winType||'',seenMs:now,liveMs:live?now:null,endMs:fin?now:null};
+            else if(fin&&!cur.endMs) doc=Object.assign({},cur,{endMs:now,aWin:!!a.isWinner,winType:fb.winType||''});
+            else if(live&&!cur.liveMs&&!cur.endMs) doc=Object.assign({},cur,{liveMs:now});
+            if(doc){ delete doc.id; floObs[fb.id]=Object.assign({id:fb.id},doc); if(db){ try{ await db.collection(FLOC()).doc(fb.id).set(doc); }catch(e){} } }
           }
         }
       }
-      floNote('Flo: '+seen+' finished'+(marked?' · '+marked+' new':'')+(miss?' · '+miss+' not on a sheet':''));
+      onFlo();
     }catch(e){ floNote('Flo: read failed'); }
     floBusy=false;
   }
@@ -726,7 +756,7 @@ window.MT_DB=(function(){
   setInterval(()=>{ if(!$('modal').classList.contains('open')) renderAll(); },20000);
 
   let unsub=null;
-  function subscribe(){ if(!db) return; try{ if(unsub) unsub(); }catch(e){} try{ unsub=db.collection(BOUTS()).onSnapshot(snap=>{ mergeSnap(snap); if(!$('modal').classList.contains('open')) renderAll(); else project(); $('status').textContent='Live · '+(MEET.title||MEET.id)+' · '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'}); },err=>{ $('status').textContent='Sync error: '+(err.code||err.message); }); }catch(e){ $('status').textContent='Sync unavailable: '+(e.code||e.message); } }
+  function subscribe(){ if(!db) return; try{ floSubscribe(); }catch(e){} try{ if(unsub) unsub(); }catch(e){} try{ unsub=db.collection(BOUTS()).onSnapshot(snap=>{ mergeSnap(snap); try{ applyFlo(); }catch(e){} if(!$('modal').classList.contains('open')) renderAll(); else project(); $('status').textContent='Live · '+(MEET.title||MEET.id)+' · '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'}); },err=>{ $('status').textContent='Sync error: '+(err.code||err.message); }); }catch(e){ $('status').textContent='Sync unavailable: '+(e.code||e.message); } }
   buildRoster(); loadLocal(); renderAll();
   (async()=>{
     db=window.MT_DB||await window.claude?.use?.('db');
@@ -738,7 +768,7 @@ window.MT_DB=(function(){
       if(cur&&meetsIdx[cur]&&meetsIdx[cur].mats&&(cur!==MEET.id||JSON.stringify(meetsIdx[cur].mats)!==JSON.stringify(MATS))){ const x=meetsIdx[cur]; MEET={id:x.id||cur,title:x.title,start:x.start,track:x.track,prior:x.prior||null,startWt:x.startWt||null,startAt:x.startAt||null,work:x.work||null}; MATS=x.mats; try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){} state={}; glog={}; buildRoster(); loadLocal(); renderAll(); }
       else if(cur===MEET.id&&meetsIdx[cur]&&meetsIdx[cur].prior&&!MEET.prior){ MEET.prior=meetsIdx[cur].prior; }
     }catch(e){ $('status').textContent='Roster read failed: '+(e.code||e.message); }
-    try{ const s0=await db.collection(BOUTS()).get(); const have={}; s0.docs.forEach(d=>{ have[d.id]=1; }); mergeSnap(s0); Object.keys(state).forEach(k=>{ if(!have[k]) queue[k]=1; }); mirror(); }catch(e){}
+    try{ const s0=await db.collection(BOUTS()).get(); const have={}; s0.docs.forEach(d=>{ have[d.id]=1; }); mergeSnap(s0); Object.keys(state).forEach(k=>{ if(!have[k]&&!(state[k]&&state[k].auto)) queue[k]=1; }); mirror(); }catch(e){}
     flush();
     try{ const gs=await db.collection(GLOG()).get(); gs.docs.forEach(d=>{ glog[d.id]=d.data(); }); mirror(); }catch(e){}
     subscribe();
