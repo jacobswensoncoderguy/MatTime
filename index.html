@@ -343,7 +343,7 @@ window.MT_DB=(function(){
   // bouts a sheet still has to run: waiting bouts after its furthest logged position in running order (all of them if nothing logged yet)
   function remainingOn(sh){ const O=order(sh); const bouts=flat(sh); let lastP=-1; O.forEach((i,p)=>{ const x=state[key(sh,i)]||{}; if(x.start!=null||x.end!=null) lastP=p; }); let n=0; O.forEach((i,p)=>{ const x=state[key(sh,i)]||{}; if(p>lastP&&!isF(bouts[i],x)&&x.start==null) n++; }); return n; }
   function project(){
-    const tv=$('track').value; if(!tv) return; const [tm,ti]=tv.split('|'); const N=+ti; const bouts=flat(tm); if(!bouts[N]) return;
+    const tv=$('track').value; const blank=()=>{ $('boardLbl').textContent='No roster loaded yet'; $('upText').textContent='—'; $('upSub').textContent='add the sheets in Meets, Edit this roster'; $('etaText').textContent='—'; $('winText').textContent='—'; $('noteText').textContent=''; }; if(!tv){ blank(); return; } const [tm,ti]=tv.split('|'); const N=+ti; const bouts=MATS[tm]?flat(tm):[]; if(!bouts[N]){ blank(); return; }
     const r0=+$('rate').value||4.3; const start0=toMin($('startTime').value)+((MEET.prior&&MEET.prior.slip!=null)?MEET.prior.slip:15); const now=nowMin(); const own=state[key(tm,N)]||{}; const gk=key(tm,N);
     const who=(()=>{ const q=($('find').value||'').trim().toLowerCase(); const b=bouts[N]; const hit=[b[1],b[2]].find(n=>n&&q&&n.toLowerCase().includes(q)); return hit||b[2]||b[1]; })();
     $('boardLbl').textContent=who+' · '+MATS[tm].name+' #'+(N+1);
@@ -634,7 +634,7 @@ window.MT_DB=(function(){
     NAMES.forEach(x=>{ const o=document.createElement('option'); o.value=x.n; $('names').appendChild(o); });
     $('track').value=MEET.track||$('track').options[0]?.value||'';
     { const me=NAMES.find(x=>x.n.replace(/\*/g,'').trim().toLowerCase()==='oliver swenson'); if(me) $('track').value=me.v; }
-    { const [m,i]=$('track').value.split('|'); const b=flat(m)[+i]; const mine=b&&[b[1],b[2]].find(n=>n&&/oliver swenson/i.test(n)); $('find').value=b?(mine||b[1]||b[2]):''; }
+    { const tv0=$('track').value; const [m,i]=tv0?tv0.split('|'):[null,0]; const b=(m&&MATS[m])?flat(m)[+i]:null; const mine=b&&[b[1],b[2]].find(n=>n&&/oliver swenson/i.test(n)); $('find').value=b?(mine||b[1]||b[2]):''; }
     $('startTime').value=MEET.start||'16:30'; $('meetTitle').textContent=MEET.title||MEET.id; $('meetStart').textContent='Starts '+fmt(toMin(MEET.start||'16:30'));
   }
   function selectTrack(v,label){ $('track').value=v; $('find').value=label||''; try{ localStorage.setItem(LS('track'),v); }catch(e){} renderAll(); toast('Tracking '+label); }
