@@ -1,0 +1,668 @@
+<html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Mat Time</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: phone-first. Sticky header = tracked wrestler + window + up-in. Below: one big "mat card" per mat (the only control most people touch),
+   then a tabbed sheet (Mat 1 / Mat 2 / Log) for corrections. Every write goes through commit() which recomputes and re-renders everything. */
+:root{
+  --bg:#f3f1ec; --panel:#ffffff; --fg:#17191c; --muted:#5d6168; --line:#d9d5cc;
+  --accent:#b8321f; --accent-fg:#ffffff; --good:#2a7a3b; --gold:#ffd54a; --gold-fg:#1a1a1a; --gold-dk:#b8860b;
+  --m1:#1f4e9c; --m1bg:#e7eef9; --m2:#b8321f; --m2bg:#f9e9e6;
+  --display:"Barlow Condensed","Arial Narrow",Impact,sans-serif; --body:"Barlow","Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#151618; --panel:#1f2124; --fg:#f1efe9; --muted:#a3a7ad; --line:#34373c; --accent:#e8553f; --accent-fg:#141414; --good:#5fc273;
+  --m1:#3b76d1; --m1bg:#15233a; --m2:#e8553f; --m2bg:#3a1a15; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#151618; --panel:#1f2124; --fg:#f1efe9; --muted:#a3a7ad; --line:#34373c; --accent:#e8553f; --accent-fg:#141414; --good:#5fc273;
+  --m1:#3b76d1; --m1bg:#15233a; --m2:#e8553f; --m2bg:#3a1a15; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.3;margin:0;
+  padding-block:0 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--fg)}
+main{max-width:860px;margin:0 auto;display:grid;gap:12px}
+button{font:inherit;cursor:pointer;border-radius:8px;padding:8px 12px;font-weight:700;background:var(--panel);color:var(--fg);border:1px solid var(--line)}
+button:focus,input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+button:disabled{opacity:.45;cursor:default}
+input,select{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+
+/* header */
+.hdr{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--fg);color:var(--bg);border-radius:0 0 12px 12px;padding:10px 14px 12px;display:grid;gap:8px}
+.hdr .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hdr h1{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:.04em;text-transform:uppercase;margin:0;line-height:1}
+.hdr .meet{font-size:12px;opacity:.85;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;background:rgba(255,255,255,.1);color:var(--bg);border:0;padding:5px 10px}
+.hdr .meet::after{content:' ▾';opacity:.7}
+.dlg textarea{font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;width:100%;min-height:110px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px}
+.dlg .meetrow{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
+.dlg .meetrow small{display:block;color:var(--muted)}
+.hdr .pick{flex:1 1 200px;display:flex;gap:6px;min-width:0}
+.hdr .pick input{background:var(--bg);color:var(--fg);border:0;font-weight:600}
+.hdr .pick button{background:var(--accent);color:var(--accent-fg);border:0;white-space:nowrap}
+.hdr .big{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}
+.upin{text-align:center;background:var(--accent);color:var(--accent-fg);border-radius:10px;padding:6px 14px;min-width:96px}
+.upin .n{font-family:var(--display);font-weight:800;font-size:40px;line-height:1}
+.upin .l{font-family:var(--display);font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.9}
+.win .who{font-family:var(--display);font-size:13px;letter-spacing:.1em;text-transform:uppercase;opacity:.75}
+.win .t{font-family:var(--display);font-weight:800;font-size:clamp(22px,6.4vw,38px);line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.win .eta{font-family:var(--display);font-size:18px;font-weight:600}
+.win .eta b{color:var(--accent)}
+.hdr .note{font-size:12px;opacity:.8}
+.hdr .score{font-family:var(--display);font-size:13px;letter-spacing:.04em;background:rgba(255,255,255,.12);padding:4px 8px;border-radius:6px}
+.hdr .status{font-size:11px;opacity:.7;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.hdr .status button{background:var(--bg);color:var(--fg);border:0;padding:4px 10px;font-size:12px}
+.hdr.flash{box-shadow:inset 0 0 0 3px var(--accent)}
+
+/* mat cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.card{border-radius:12px;border:3px solid var(--mc);background:var(--panel);overflow:hidden;display:grid;grid-template-rows:auto 1fr auto}
+.card{--mc:var(--m1)} .card.c0{--mc:var(--m1)} .card.c1{--mc:var(--m2)} .card.c2{--mc:#2a7a3b} .card.c3{--mc:#6d3fb3} .card.c4{--mc:#b36b00} .card.c5{--mc:#007a8a}
+.chips{display:flex;gap:6px;flex-wrap:wrap} .chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.card h2{margin:0;background:var(--mc);color:#fff;font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.card h2 span{font-family:var(--body);font-size:11px;font-weight:500;letter-spacing:0;text-transform:none;opacity:.9;white-space:nowrap}
+.card .body{padding:10px 12px;display:grid;gap:8px}
+.card .state{font-family:var(--display);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mc);display:flex;justify-content:space-between;align-items:center}
+.card .state .clock{font-family:var(--display);font-size:26px;font-weight:800;color:var(--fg);font-variant-numeric:tabular-nums}
+.card .names{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center}
+.card .names button{padding:10px 6px;font-size:15px;line-height:1.15;border:2px solid var(--line);background:var(--bg);border-radius:10px;min-height:54px;white-space:normal}
+.card .names button.win{border-color:var(--good);background:var(--good);color:#fff}
+.card .names button.lose{opacity:.45;text-decoration:line-through}
+.card .names .vs{font-family:var(--display);color:var(--muted);font-size:12px}
+.card .wt{font-size:12px;color:var(--muted);text-align:center}
+.card .go{display:grid;grid-template-columns:1fr auto;gap:8px}
+.card .go .main{background:var(--mc);color:#fff;border:0;font-family:var(--display);font-size:24px;letter-spacing:.06em;text-transform:uppercase;padding:14px;border-radius:10px}
+.card .go .main.end{background:var(--fg);color:var(--bg)}
+.card .go .alt{font-size:12px;padding:6px 10px}
+.card .foot{border-top:1px solid var(--line);padding:6px 12px;font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.card.idle .body{opacity:.85}
+.card .tracked{background:var(--gold);color:var(--gold-fg);font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+
+/* tabs + sheet */
+.tabs{display:flex;gap:6px}
+.tabs button{flex:1;padding:8px;font-family:var(--display);letter-spacing:.08em;text-transform:uppercase}
+.tabs button[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.sheet{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.sheet .sec{font-family:var(--display);letter-spacing:.1em;text-transform:uppercase;font-size:12px;color:var(--muted);padding:6px 12px;background:var(--bg);border-top:1px solid var(--line)}
+.r{display:grid;grid-template-columns:2.2em 2.8em 1fr 1fr auto;gap:6px;align-items:center;padding:7px 10px;border-top:1px solid var(--line);cursor:pointer;min-height:40px}
+.r .n{color:var(--muted);font-variant-numeric:tabular-nums}
+.r .w{font-weight:700}
+.r .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.r .nm.win{color:var(--good);font-weight:700} .r .nm.win::before{content:'W '} .r .nm.lose{color:var(--muted);text-decoration:line-through}
+.r .chip{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:var(--bg);border:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+.r.done{color:var(--muted)} .r.done .chip{background:var(--line)}
+.r.live .chip{background:var(--good);color:#fff;border-color:var(--good)}
+.r.next .chip{background:var(--mc);color:#fff;border-color:var(--mc)}
+.r.ours{background:var(--gold);color:var(--gold-fg)} .r.ours .n,.r.ours .nm,.r.ours .nm.lose{color:var(--gold-fg)} .r.ours .nm:first-of-type::before{content:'★ '}
+.r.ff{opacity:.55}
+.log{display:grid;grid-template-columns:1fr auto auto auto auto;gap:6px;padding:6px 10px;border-top:1px solid var(--line);font-size:13px;font-variant-numeric:tabular-nums}
+.log.h{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:20;padding:0 max(8px,env(safe-area-inset-left,0px)) max(8px,env(safe-area-inset-bottom,0px))}
+.modal.open{display:flex}
+.dlg{background:var(--panel);color:var(--fg);border-radius:14px;width:min(560px,100%);padding:14px;display:grid;gap:10px;max-height:88vh;overflow:auto}
+.dlg h3{margin:0;font-family:var(--display);font-size:18px;letter-spacing:.04em;text-transform:uppercase}
+.dlg .warn{background:var(--m2bg);color:var(--fg);border:1px solid var(--accent);padding:8px 10px;border-radius:8px;font-size:13px}
+.dlg .g{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dlg label{display:grid;gap:4px;font-size:12px;font-weight:700;color:var(--muted)}
+.dlg .tl{display:flex;gap:6px}
+.dlg .tl button{padding:6px 8px;font-size:12px}
+.dlg .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.dlg .acts .save{background:var(--accent);color:var(--accent-fg);border:0}
+.dlg .acts .danger{color:var(--accent)}
+.dlg .seg{display:flex;gap:6px} .dlg .seg button{flex:1;white-space:normal} .dlg .seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.dlg .list{display:grid;gap:6px;max-height:50vh;overflow:auto} .dlg .list button{text-align:left;white-space:normal}
+details.adv{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+details.adv summary{cursor:pointer;font-weight:700;color:var(--muted);font-size:13px}
+details.adv .g{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:8px}
+details.adv label{display:grid;gap:4px;font-size:12px;font-weight:700;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){ .toast{transition:none} }
+</style>
+
+<main>
+  <header class="hdr" id="hdr">
+    <div class="row"><h1>Mat Clock</h1><button type="button" class="meet" id="meetTitle" title="Meets: history, new meet, roster"></button><button type="button" class="meet" id="meetStart" style="flex:0 0 auto" title="Scheduled start"></button></div>
+    <div class="row">
+      <div class="pick"><input type="search" id="find" list="names" placeholder="Type a wrestler or weight" autocomplete="off"><datalist id="names"></datalist><button type="button" id="clearFind" title="Clear" style="background:var(--bg);color:var(--fg);border:0;padding:0 12px">×</button><button type="button" id="go">Track</button></div>
+      <select id="track" hidden></select>
+    </div>
+    <div class="big">
+      <div class="upin"><div class="l">Up in</div><div class="n" id="upText">—</div><div class="l" id="upSub">bouts</div></div>
+      <div class="win"><div class="who" id="boardLbl">—</div><div class="t" id="winText">—</div><div class="eta">Best guess <b id="etaText">—</b></div></div>
+    </div>
+    <div class="note" id="noteText"></div>
+    <div class="score" id="scoreText"></div>
+    <div class="status"><span id="status">Connecting…</span><span style="display:flex;gap:6px"><button type="button" id="meetsBtn">Meets</button><button type="button" id="newMeetBtn" style="background:var(--accent);color:var(--accent-fg)">+ New meet</button><button type="button" id="refresh">Refresh</button></span></div>
+  </header>
+
+  <section class="cards">
+  </section>
+
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <section class="sheet" id="sheet"></section>
+
+  <details class="adv"><summary>Settings</summary>
+    <div class="g">
+      <label>Scheduled start <input type="time" id="startTime" value="16:30"></label>
+      <label>Default pace (min/bout) <input type="number" id="rate" step="0.1" min="2" value="4.3"></label>
+      <label>Unlogged earlier bouts <select id="skipped"><option value="auto">Auto</option><option value="todo">All still to come</option><option value="done">All already wrestled</option></select></label>
+      <label style="grid-column:1/-1">Which mats work each sheet (tap to change mid-meet)<div id="work" class="chips" style="display:grid;gap:6px"></div></label>
+    </div>
+  </details>
+</main>
+
+<div class="modal" id="modal"><div class="dlg" id="dlg"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// MatTime public build: shared data lives in Supabase (one table, public.docs). The key below must be the PUBLISHABLE/anon key only.
+window.MT_CONFIG={url:'https://neasjlyymaufxxpprduv.supabase.co',key:''};
+window.MT_DB=(function(){
+  var c=window.MT_CONFIG; if(!c||!c.key) return null;
+  var base=c.url+'/rest/v1/docs', H={apikey:c.key,Authorization:'Bearer '+c.key,'Content-Type':'application/json'};
+  function req(method,qs,body,extra){
+    return fetch(base+qs,{method:method,headers:Object.assign({},H,extra||{}),body:body?JSON.stringify(body):undefined}).then(function(r){
+      return r.text().then(function(t){ if(!r.ok){ var e=new Error(t||String(r.status)); e.code=r.status; throw e; } return t?JSON.parse(t):null; }); });
+  }
+  function snapDoc(row){ return {id:row.id,exists:true,data:function(){return row.data;}}; }
+  function upsert(path,id,d){ return req('POST','?on_conflict=path',{path:path+'/'+id,coll:path,id:id,data:d,updated_at:new Date().toISOString()},{Prefer:'resolution=merge-duplicates,return=minimal'}); }
+  function coll(path){
+    function list(){ return req('GET','?select=id,data&coll=eq.'+encodeURIComponent(path)+'&limit=5000').then(function(rows){ return {docs:(rows||[]).map(snapDoc)}; }); }
+    return {
+      get:list,
+      doc:function(id){
+        var p=path+'/'+id;
+        function get(){ return req('GET','?select=id,data&path=eq.'+encodeURIComponent(p)).then(function(rows){ return rows&&rows[0]?snapDoc(rows[0]):{id:id,exists:false,data:function(){return null;}}; }); }
+        return { get:get,
+          set:function(d){ return upsert(path,id,d); },
+          update:function(d){ return get().then(function(sn){ return upsert(path,id,Object.assign({},sn.exists?sn.data():{},d)); }); },
+          delete:function(){ return req('DELETE','?path=eq.'+encodeURIComponent(p)); } };
+      },
+      onSnapshot:function(cb,err){
+        var stop=false,last=null;
+        function tick(){ if(stop) return;
+          list().then(function(sn){ var sig=JSON.stringify(sn.docs.map(function(d){return [d.id,d.data()];})); if(sig!==last){ last=sig; cb(sn); } })
+            .catch(function(e){ if(err) err(e); })
+            .then(function(){ if(!stop) setTimeout(tick,4000); }); }
+        tick(); return function(){ stop=true; };
+      }
+    };
+  }
+  return {collection:coll};
+})();
+</script>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const DEFAULT_MATS={
+    m1:{name:"Mat 1",sections:[
+      {label:"Varsity",bouts:[
+        [85,"Rowen Williams","Sawyer Singleton"],[90,"Dylan Doyon","Clayton Bettis"],[95,"Kwin Humphries","Nash White"],[100,"Cade Battles","Garrett Miller"],[105,"Clayton Andrews","Brant Helvey"],
+        [110,"Joseph Scerbo","Conner Tracy"],[115,"Luca Cutler","Miles Ward"],[120,"Richard Marcoux","Grayson Mcmurtrey"],[126,"Graeysen Wilson","Nolan Childress"],[132,"Aiden Holsclaw","Charlie Carlson"],
+        [138,"Roy Hodson","Sloan Nelson"],[147,"Crew Miller","Andrew Eby"],[160,"Jax Fuhriman","Kaleb Tustin"],[175,"Skyler Waddel","Zedrick Abney"],[190,"","Kaleb Schulz"],[215,"","Dominic Ayala-Gutierrez"],
+        [70,"Ethan Dolci",""],[75,"Dylan Pavey","Liam Singleton"],[80,"Brooks Pingree","Kase Thomsen"],[132,"Lincoln Barba","Daniel Nyby"]]},
+      {label:"JV (after varsity)",bouts:[
+        [138,"Jack Rhodenbaugh","Maxwell Weigle"],[147,"Zane Urquiaga","Jaxen Mitchell"],[147,"Crew Miller","Trever Forrester"],[147,"Beau Boepple (LHMS)","Jaxon Kofoed (LHMS)"],
+        [160,"Jace Jones","Gunner Johnson"],[190,"","Kaleb Schulz"],[215,"Dominic Ayala-Gutierrez (LHMS)","Kevin Saw"],["HVY","","Colton Haynes"],
+        [70,"Ethan Dolci","Blake Bear (EMS)"],[70,"Killian Callinan","Wyatt Dowell (EMS)"],[75,"Drew Duffy","Asher Blair (EMS)"],[80,"Jax Huber","Jack Hendrix"],[80,"Hudson Warren","Maverick Flick (EMS)"],[80,"Cole Butler","Luke Amidon (EMS)"],
+        [126,"Logan Gates","Amilio Mrsic"],[132,"Ben Walsh","Lucas Ramirez Soto"],[147,"Zane Urquiaga","Jase Lamay"],
+        [138,"Jacob Ruiz","Banner Htoo"],[138,"Kason Thompson","Rok Donkersloot"],[138,"","Anson Orstrander"]]}
+    ]},
+    m2:{name:"Mat 2",sections:[
+      {label:"JV",bouts:[
+        [85,"Colton Licht","Gemonie Abney"],[85,"Adam Stocker","Maxwell Blacketter"],[85,"Everlin Werley","Benton Bryan"],[85,"Kennedy Werley","Chrystopher Craig"],
+        [90,"Griffin Chatel","Kelland Carlsen"],[90,"Spencer Butler","William Kelsay"],[90,"Luke Rigby","Gibson Perry"],
+        [95,"Micah Hedberg","Logan O'tool"],[95,"Jacob Kuklish","Gattlin Scott"],[95,"Mary Woodward","Marley Rexius"],[95,"Abel Miller","Scott Gattlin"],
+        [100,"Zoe Ray","Trinity Dewey"],[100,"Kyler Kofoed","Raymond Newman"],[100,"Wyatt Kulaga","Easton Peebles"],
+        [105,"Ryan Nieko","Hunter Seibert"],[105,"Landon Alvarado","Cruz Washburn"],[105,"Zoe Ray","Hawa Seituah"],
+        [110,"Marshall Jones","Carson Rady"],[110,"Lillith Humphreys","Tenley Campbell"],[110,"Declan Lacey","Ryan Lassandro"],[110,"Oliver Swenson","Jack Yavurian"],[110,"Cruz Hofmeister","Ryan Lassandro"],
+        [115,"Dallin Christensen","Matthew Livingston"],[115,"Tanner Farnung","Lucas Mai"],[115,"William St. John","Matthew Dugalic"],[115,"Giovani Alexander","Gaige Donelson"],[115,"Gwendolyn Stocker","Maevie Miller"],
+        [85,"Ryan Thompson","Chrystopher Craig"],[100,"Brantley Griffith","Easton Peebles"],[100,"Abram Proffitt","Raymond Newman"],[105,"Gus Graf","Cruz Washburn"],
+        [120,"Preston Hansen","Braylon Korn"],[120,"Josh Stonehouse","Braylon Korn"],[120,"Archer Miller","Grayson Mcmurtrey"],
+        [120,"Gwendolyn Stocker","Tialisa Seituah"],[126,"Maximus Holman","Ryker Thorne"],[126,"Adi Crank","Selah Wanyonyi"],[126,"Chloe Pontarelli","Amilio Mrsic"],[126,"Maximus Gamach Starr","Charles Westenskow"],[126,"Anabelle Mim","Ricardo Jacquez"],
+        [132,"Grace Whitmer","Lucas Ramirez Soto"],[132,"Lucas Urbanus","Charles Campbell"],[138,"Jacob Ruiz","Banner Htoo"]]}
+    ]}
+  };
+  // ---------- meet / roster ----------
+  let MEET={id:'2026-11-05',title:'Eagle vs Lake Hazel · Nov 5',start:'16:30',track:'m2|20',split:'0'};
+  let MATS=DEFAULT_MATS;
+  try{ const c=JSON.parse(localStorage.getItem('matclock.meet')||'null'); if(c&&c.id&&c.mats){ MEET=c; MATS=c.mats; } }catch(e){}
+  const LS=k=>'matclock.'+MEET.id+'.'+k;
+  const BOUTS=()=>'meets/'+MEET.id+'/bouts', GLOG=()=>'meets/'+MEET.id+'/guesslog';
+  const MIDS=()=>Object.keys(MATS);                       // sheet/mat ids m1..mN in order
+  const cidx=m=>Math.max(0,MIDS().indexOf(m));
+  // MEET.work: sheetId -> [matIds working it]. Default: each sheet on its own mat.
+  const workOf=sh=>{ const w=MEET.work&&MEET.work[sh]; if(w&&w.length) return w.filter(m=>MATS[m]); const idle=MIDS().filter(m=>m!==sh&&!flat(m).length); return [sh,...idle]; };
+  const sheetsOf=m=>MIDS().filter(sh=>workOf(sh).includes(m));
+  const flat=m=>MATS[m].sections.flatMap(s=>s.bouts);
+  const key=(m,i)=>m+'-'+String(i+1).padStart(2,'0');
+  const unkey=k=>[k.slice(0,2),+k.slice(3)-1];
+  // Running order per mat: within each section, start at the meet's starting weight class (first bout with weight >= startWt), run to the top, then wrap to the lightest.
+  // MEET.startWt (number) or MEET.startAt {m1:idx,m2:idx} (sheet index chosen by hand). Returns sheet indices in the order they will be wrestled.
+  function order(m){
+    const out=[]; let base=0;
+    MATS[m].sections.forEach(sec=>{ const n=sec.bouts.length; let s=0;
+      const sa=MEET.startAt&&MEET.startAt[m]; if(sa!=null&&sa>=base&&sa<base+n) s=sa-base;
+      else if(MEET.startWt){ const j=sec.bouts.findIndex(b=>typeof b[0]==='number'&&b[0]>=MEET.startWt); if(j>0) s=j; }
+      for(let q=0;q<n;q++) out.push(base+((s+q)%n)); base+=n; });
+    return out;
+  }
+  const pos=(m,i)=>order(m).indexOf(i);
+  const isF=(b,s)=>{ if(s&&s.forfeit===true) return true; if(s&&s.forfeit===false) return false; return !b[1]||!b[2]; };
+  const toMin=t=>{ if(!t) return null; const p=t.split(':').map(Number); return p[0]*60+p[1]+(p[2]||0)/60; };
+  const fmt=m=>{ if(m==null) return '—'; m=Math.round(m); let h=Math.floor(m/60)%24, mm=m%60; const ap=h>=12?'PM':'AM'; h=h%12||12; return h+':'+String(mm).padStart(2,'0')+' '+ap; };
+  const fmts=m=>{ if(m==null) return '—'; const t=Math.round(m*60); let h=Math.floor(t/3600)%24; const ap=h>=12?'PM':'AM'; h=h%12||12; return h+':'+String(Math.floor(t/60)%60).padStart(2,'0')+':'+String(t%60).padStart(2,'0')+' '+ap; };
+  const hhmmss=m=>{ if(m==null) return ''; const t=Math.round(m*60); return String(Math.floor(t/3600)).padStart(2,'0')+':'+String(Math.floor(t/60)%60).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); };
+  const mss=m=>{ if(m==null) return ''; const t=Math.max(0,Math.round(m*60)); return Math.floor(t/60)+':'+String(t%60).padStart(2,'0'); };
+  const nowMin=()=>{ const d=new Date(); return d.getHours()*60+d.getMinutes()+d.getSeconds()/60; };
+  const toast=t=>{ const el=$('toast'); el.textContent=t; el.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('on'),1800); };
+  const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  // ---------- state + store (one doc per bout, one doc per guess; merge by updatedAtMs) ----------
+  let state={}, glog={}, db=null, tab='m1';
+  const queue={}; let flushing=false;
+  function mirror(){ try{ localStorage.setItem(LS('state'),JSON.stringify(state)); localStorage.setItem(LS('glog'),JSON.stringify(glog)); }catch(e){} }
+  function loadLocal(){ try{ state=JSON.parse(localStorage.getItem(LS('state'))||'{}')||{}; }catch(e){ state={}; } try{ glog=JSON.parse(localStorage.getItem(LS('glog'))||'{}')||{}; }catch(e){ glog={}; } }
+  async function flush(){
+    if(flushing||!db) return; flushing=true;
+    for(const k of Object.keys(queue)){ delete queue[k];
+      try{ if(k.startsWith('g:')){ const id=k.slice(2); if(glog[id]) await db.collection(GLOG()).doc(id).set(glog[id]); } else if(state[k]) { await db.collection(BOUTS()).doc(k).set(state[k]); } }
+      catch(e){ queue[k]=1; $('status').textContent='Save failed ('+(e.code||e.message)+'), retrying…'; setTimeout(flush,3000); } }
+    flushing=false; if(Object.keys(queue).length) flush();
+  }
+  // The one write path. Everything that changes a bout goes through here, and everything re-renders after it.
+  function commit(k,patch,msg){
+    const cur={...(state[k]||{}),...patch,updatedAtMs:Date.now()};
+    Object.keys(cur).forEach(f=>{ if(cur[f]===null||cur[f]===undefined) delete cur[f]; });
+    state[k]=cur; mirror(); queue[k]=1; flush(); renderAll(); if(msg) toast(msg);
+  }
+  function mergeSnap(snap){
+    snap.docs.forEach(d=>{ const loc=state[d.id]||{}, srv=d.data()||{}; if((srv.updatedAtMs||0)>=(loc.updatedAtMs||0)) state[d.id]={...srv}; else queue[d.id]=1; });
+    mirror(); flush();
+  }
+
+  // ---------- model ----------
+  function onMat(m){ const out=[]; MIDS().forEach(sh=>flat(sh).forEach((b,i)=>{ const x=state[key(sh,i)]||{}; if(isF(b,x)) return; if((x.onMat||sh)!==m) return; if(x.start==null&&x.end==null) return; out.push({sh,i,b,x}); })); return out.sort((a,b)=>(a.x.start??a.x.end)-(b.x.start??b.x.end)); }
+  function stats(m){
+    const rows=onMat(m).slice(-9); let d=[],g=[];
+    rows.forEach((r,k)=>{ const x=r.x; if(x.start!=null&&x.end!=null&&x.end>=x.start) d.push(x.end-x.start);
+      const p=rows[k-1]; if(x.start!=null&&p&&p.x.end!=null&&x.start>=p.x.end&&x.start-p.x.end<30) g.push(x.start-p.x.end); });
+    const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+    return {dur:d.length?mean(d):0,gap:g.length?mean(g):0,nd:d.length,ng:g.length};
+  }
+  // recent start-to-start pace (last 6 logged starts) across the mat's own sheet, counting the sheet positions between first and last logged start (unlogged bouts in between still took time), minus forfeits
+  function paceOf(m){ let rows=onMat(m).filter(r=>r.x.start!=null&&r.sh===m); if(rows.length<2) return null; rows=rows.slice(-6); const a=rows[0], z=rows[rows.length-1]; const bouts=flat(m); const O=order(m); const pa=pos(m,a.i), pz=pos(m,z.i); let f=0; for(let q=Math.min(pa,pz);q<Math.max(pa,pz);q++){ const i=O[q]; if(isF(bouts[i],state[key(m,i)])) f++; } const n=Math.abs(pz-pa)-f; return n>0?(z.x.start-a.x.start)/n:null; }
+  function matModel(m,r0){
+    const st=stats(m); let dur,gap;
+    const pr=(MEET.prior&&(MEET.prior.all||MEET.prior[m]))||null;   // pooled {dur,gap} from past meets; mat numbers are not comparable across gyms
+    const r=paceOf(m)||(pr?pr.dur+pr.gap:null)||r0||4.3;
+    if(st.nd>=2&&st.ng>=2){ dur=st.dur; gap=st.gap; }
+    else if(st.nd>=2){ dur=st.dur; gap=Math.max(0.5,r-st.dur); }   // durations known, few gaps: setup = pace minus mat time
+    else if(pr&&!paceOf(m)){ dur=pr.dur; gap=pr.gap; }            // nothing logged yet: use history
+    else { dur=r*0.6; gap=r*0.4; }
+    const rows=onMat(m); let free=null, live=null;
+    rows.forEach(r=>{ if(r.x.start!=null&&r.x.end==null) live=r; });
+    const lastEnd=rows.reduce((a,r)=>r.x.end!=null?Math.max(a??-1,r.x.end):a,null);
+    const lastStart=rows.reduce((a,r)=>r.x.start!=null?Math.max(a??-1,r.x.start):a,null);
+    if(live) free=Math.max(live.x.start+dur, nowMin()); else if(lastEnd!=null) free=lastEnd; else if(lastStart!=null) free=lastStart+dur;
+    const waiting=flat(m).map((b,i)=>({i,b,x:state[key(m,i)]||{}})).filter(o=>!isF(o.b,o.x)&&o.x.start==null).map(o=>o.i);
+    return {dur,gap,free,waiting,live,measured:st.nd>=2&&st.ng>=2,nd:st.nd};
+  }
+  // next bout on a mat: an explicitly queued one, else the first waiting bout after the furthest logged bout, else the first waiting bout
+  function nextUp(m){
+    const bouts=flat(m); const q=bouts.findIndex((b,i)=>{ const x=state[key(m,i)]||{}; return x.queued===true&&x.start==null&&!isF(b,x); }); if(q>=0) return q;
+    const O=order(m); let lastP=-1; O.forEach((i,p)=>{ const x=state[key(m,i)]||{}; if(x.start!=null||x.end!=null) lastP=p; }); const last=lastP>=0?O[lastP]:-1;
+    for(let p=lastP+1;p<O.length;p++){ const i=O[p]; const x=state[key(m,i)]||{}; if(!isF(bouts[i],x)&&x.start==null) return i; }
+    // end of sheet reached after the last logged bout: circle back within that bout's section first (the mat is working that list out of order), then anywhere
+    const secOf=[]; MATS[m].sections.forEach((sec,si)=>sec.bouts.forEach(()=>secOf.push(si)));
+    const secStart=last>=0?secOf.indexOf(secOf[last]):0;
+    const ps=O.findIndex(i=>i===secStart);
+    for(let p=Math.max(0,ps);p<O.length;p++){ const i=O[p]; const x=state[key(m,i)]||{}; if(!isF(bouts[i],x)&&x.start==null) return i; }
+    for(let p=0;p<O.length;p++){ const i=O[p]; const x=state[key(m,i)]||{}; if(!isF(bouts[i],x)&&x.start==null) return i; }
+    return -1;
+  }
+  // bouts a sheet still has to run: waiting bouts after its furthest logged position in running order (all of them if nothing logged yet)
+  function remainingOn(sh){ const O=order(sh); const bouts=flat(sh); let lastP=-1; O.forEach((i,p)=>{ const x=state[key(sh,i)]||{}; if(x.start!=null||x.end!=null) lastP=p; }); let n=0; O.forEach((i,p)=>{ const x=state[key(sh,i)]||{}; if(p>lastP&&!isF(bouts[i],x)&&x.start==null) n++; }); return n; }
+  function project(){
+    const tv=$('track').value; if(!tv) return; const [tm,ti]=tv.split('|'); const N=+ti; const bouts=flat(tm); if(!bouts[N]) return;
+    const r0=+$('rate').value||4.3; const start0=toMin($('startTime').value)+((MEET.prior&&MEET.prior.slip!=null)?MEET.prior.slip:15); const now=nowMin(); const own=state[key(tm,N)]||{}; const gk=key(tm,N);
+    const who=(()=>{ const q=($('find').value||'').trim().toLowerCase(); const b=bouts[N]; const hit=[b[1],b[2]].find(n=>n&&q&&n.toLowerCase().includes(q)); return hit||b[2]||b[1]; })();
+    $('boardLbl').textContent=who+' · '+MATS[tm].name+' #'+(N+1);
+    if(own.start!=null){ $('upText').textContent=own.end!=null?'DONE':'LIVE'; $('upSub').textContent=(own.end!=null?'wrestled':'on the mat')+' · '+MATS[own.onMat||tm].name; $('winText').textContent=fmts(own.start); $('etaText').textContent=fmt(own.start); $('noteText').textContent='Started '+fmts(own.start)+(own.end!=null?' · lasted '+mss(own.end-own.start):' · '+mss(now-own.start)+' elapsed')+'.'; renderScore(gk); return; }
+    if(isF(bouts[N],own)){ $('upText').textContent='FF'; $('upSub').textContent='forfeit'; $('winText').textContent='Forfeit'; $('etaText').textContent='—'; $('noteText').textContent='Marked forfeit; no bout to time.'; renderScore(gk); return; }
+    const M=matModel(tm,r0); const pace=M.dur+M.gap;
+    const secOf=[]; MATS[tm].sections.forEach((sec,si)=>sec.bouts.forEach(()=>secOf.push(si)));
+    const O=order(tm); const P=i=>O.indexOf(i); const PN=P(N);
+    const lastLoggedInSec={}; const loggedP=[]; bouts.forEach((b,i)=>{ const x=state[key(tm,i)]||{}; if(x.start!=null||x.end!=null){ lastLoggedInSec[secOf[i]]=Math.max(lastLoggedInSec[secOf[i]]??-1,P(i)); loggedP.push(P(i)); } });
+    const mode=$('skipped').value;
+    const pendingIdx=i=>{ const p=P(i); if(mode==='todo') return true; if(mode==='done') return p>(lastLoggedInSec[secOf[i]]??-1); return !loggedP.some(j=>j>p&&j<PN); };
+    const nu=nextUp(tm);
+    let ahead=M.waiting.filter(i=>P(i)<PN&&pendingIdx(i)).length + ((nu>=0&&P(nu)>PN)?1:0);
+    if(nu===N) ahead=0;
+    let anchor=M.free!=null?M.free:start0; const live=M.free!=null; anchor=Math.max(anchor,now);
+    // lanes: every mat assigned to this sheet. A mat still working its own sheet joins once that sheet is done.
+    const lanes=workOf(tm).map(m=>{ const Mm=m===tm?M:matModel(m,r0); let t=Math.max(Mm.free!=null?Mm.free:start0,now); const pm=Mm.dur+Mm.gap;
+      if(m!==tm){ const own=sheetsOf(m).filter(sh=>sh!==tm); own.forEach(sh=>{ t+=remainingOn(sh)*pm; }); } return {m,t,pace:pm,gap:Mm.gap}; });
+    let left=ahead; while(left>0){ lanes.sort((a,b)=>a.t-b.t); lanes[0].t+=lanes[0].pace; left--; }
+    lanes.sort((a,b)=>a.t-b.t); const lane=lanes[0]; const eta=lane.t+lane.gap; const half=live?Math.max(3,1.0*ahead+2):Math.min(40,Math.max(15,0.12*ahead*pace));
+    const matNames=lanes.filter(l=>l.t<=eta+half).map(l=>MATS[l.m].name); const matLabel=matNames.length>1?matNames.join(' or '):MATS[lane.m].name;
+    $('upText').textContent=ahead===0?'NEXT':String(ahead); $('upSub').textContent=(ahead===1?'bout ahead':'bouts ahead')+' · '+matLabel;
+    $('winText').textContent=fmt(eta-half)+' – '+fmt(eta+half); $('etaText').textContent=fmt(eta);
+    $('noteText').textContent=(live?('Mat '+mss(M.dur)+' + setup '+mss(M.gap)+' = '+pace.toFixed(1)+' min/bout'+(M.measured?' ('+M.nd+' timed)':' (early estimate)')+'; mat free ~'+fmt(anchor)):('No bouts logged on this mat; assuming first whistle '+fmt(start0)+' at '+pace.toFixed(1)+' min/bout'))+'; '+ahead+' bout'+(ahead===1?'':'s')+' still ahead of him.';
+    logGuess(gk,eta,half,{ahead,pace:Math.round(pace*100)/100,mat:tm}); renderScore(gk);
+  }
+
+  // ---------- guess log + scoring ----------
+  function logGuess(k,eta,half,extra){
+    const mine=Object.values(glog).filter(g=>g.k===k).sort((x,y)=>x.at-y.at); const last=mine[mine.length-1]; const now=Date.now();
+    if(last&&Math.abs(last.eta-eta)<0.5&&now-last.at<5*60000) return;
+    const id=k+'-'+now; glog[id]={k,at:now,eta:Math.round(eta*100)/100,half:Math.round(half*10)/10,...(extra||{})}; mirror(); queue['g:'+id]=1; flush();
+  }
+  const boutActual=k=>{ const x=state[k]; return (x&&x.start!=null)?x.start:null; };
+  function scoreRows(k){ const rows=[]; Object.values(glog).forEach(g=>{ if(k&&g.k!==k) return; const act=boutActual(g.k); if(act==null) return; rows.push({...g,act,err:g.eta-act,hit:Math.abs(g.eta-act)<=g.half}); }); return rows; }
+  function scoreOf(rows){ if(!rows.length) return null; const mae=rows.reduce((a,r)=>a+Math.abs(r.err),0)/rows.length, bias=rows.reduce((a,r)=>a+r.err,0)/rows.length, hit=rows.filter(r=>r.hit).length/rows.length; return {n:rows.length,mae,bias,hit,score:Math.round(Math.max(0,100-mae*4)*(0.5+0.5*hit)),bouts:new Set(rows.map(r=>r.k)).size}; }
+  function renderScore(k){
+    const own=scoreOf(scoreRows(k)), all=scoreOf(scoreRows(null)); const mine=Object.values(glog).filter(g=>g.k===k).length; let t='';
+    if(own) t='THIS BOUT '+own.score+'/100 · '+own.n+' guesses · avg miss '+own.mae.toFixed(1)+' min · '+(own.bias>0?'late':'early')+' by '+Math.abs(own.bias).toFixed(1);
+    else t='THIS BOUT — '+mine+' guess'+(mine===1?'':'es')+' logged, scores at the whistle';
+    if(all) t+='  ‖  ALL '+all.score+'/100 · '+all.n+' over '+all.bouts+' bout'+(all.bouts===1?'':'s')+' · miss '+all.mae.toFixed(1);
+    $('scoreText').textContent=t;
+  }
+
+  // ---------- render ----------
+  function trackedKey(){ const v=$('track').value; if(!v) return null; const [m,i]=v.split('|'); return key(m,+i); }
+  function nextForMat(m){ for(const sh of [m,...sheetsOf(m).filter(x=>x!==m)]){ if(!MATS[sh]) continue; const i=nextUp(sh); if(i>=0) return {sh,i}; } return null; }
+  function renderCard(m){
+    let el=$('card-'+m); if(!el){ el=document.createElement('div'); el.id='card-'+m; document.querySelector('.cards').appendChild(el); } el.className='card c'+(cidx(m)%6);
+    const M=matModel(m,+$('rate').value||4.3); const tk=trackedKey();
+    const live=M.live; const nx=nextForMat(m); const nu=nx?nx.i:-1; const nsh=nx?nx.sh:m; const bouts=flat(nsh);
+    let head='<h2>'+esc(MATS[m].name)+' <span>'+(M.measured?('mat '+mss(M.dur)+' · setup '+mss(M.gap)):(M.nd?'timing… ('+M.nd+')':'no bouts timed'))+'</span></h2>';
+    let body='', foot='';
+    if(live){
+      const k=key(live.sh,live.i), x=live.x, b=live.b;
+      body='<div class="state"><span>Wrestling now · #'+(live.i+1)+(live.sh!==m?' from '+esc(MATS[live.sh].name):'')+'</span><span class="clock" id="clk-'+m+'">'+mss(nowMin()-x.start)+'</span></div>'
+        +'<div class="wt">'+esc(b[0])+' lb · started '+fmts(x.start)+(k===tk?' <span class="tracked">★ tracked</span>':'')+'</div>'
+        +'<div class="names"><button type="button" data-k="'+k+'" data-a="win" data-w="ems" class="'+(x.winner==='ems'?'win':x.winner==='lhms'?'lose':'')+'">'+esc(b[1])+'</button><span class="vs">vs</span><button type="button" data-k="'+k+'" data-a="win" data-w="lhms" class="'+(x.winner==='lhms'?'win':x.winner==='ems'?'lose':'')+'">'+esc(b[2])+'</button></div>'
+        +'<div class="go"><button type="button" class="main end" data-k="'+k+'" data-a="end">End match</button><button type="button" class="alt" data-k="'+k+'" data-a="edit">Fix</button></div>';
+      foot='<span>Tap the winner, then End.</span><span>'+(nu>=0?'Next: #'+(nu+1)+' '+esc(bouts[nu][1]||bouts[nu][2])+(nsh!==m?' ('+esc(MATS[nsh].name)+' sheet)':''):'')+'</span>';
+      el.classList.remove('idle');
+    } else if(nu>=0){
+      const k=key(nsh,nu), b=bouts[nu], x=state[k]||{};
+      body='<div class="state"><span>Next up · #'+(nu+1)+(nsh!==m?' from '+esc(MATS[nsh].name)+' sheet':'')+(x.queued?' (set by hand)':'')+'</span><span class="clock">'+(M.free!=null?'free '+fmt(M.free):'')+'</span></div>'
+        +'<div class="wt">'+esc(b[0])+' lb'+(k===tk?' <span class="tracked">★ tracked</span>':'')+'</div>'
+        +'<div class="names"><button type="button" data-k="'+k+'" data-a="edit">'+esc(b[1])+'</button><span class="vs">vs</span><button type="button" data-k="'+k+'" data-a="edit">'+esc(b[2])+'</button></div>'
+        +'<div class="go"><button type="button" class="main" data-k="'+k+'" data-a="start">Start</button><button type="button" class="alt" data-k="'+k+'" data-a="other">Not this one</button></div>';
+      foot='<span>'+flat(nsh).filter((b,i)=>{ const x=state[key(nsh,i)]||{}; return !isF(b,x)&&x.start==null; }).length+' waiting on '+esc(MATS[nsh].name)+' sheet</span><button type="button" class="alt" data-k="'+k+'" data-a="ff" style="padding:2px 8px;font-size:11px">Forfeit</button>';
+      el.classList.add('idle');
+    } else {
+      const empty=!flat(m).length; body='<div class="state"><span>'+(empty?'No sheet loaded':'Sheet complete')+'</span></div>'+(empty?'<div class="wt">Meets → Edit this roster to add a photo, or assign this mat to another sheet in Settings.</div>':''); foot='<span>'+onMat(m).length+' bouts logged</span>'; el.classList.add('idle');
+    }
+    el.innerHTML=head+'<div class="body">'+body+'</div><div class="foot">'+foot+'</div>';
+  }
+  function renderSheet(){
+    const el=$('sheet'); el.innerHTML=''; const tk=trackedKey();
+    if(tab==='log'){ renderLog(el); return; }
+    const m=tab; const nu=nextUp(m); const M=matModel(m,+$('rate').value||4.3); const live=M.live&&M.live.sh===m?M.live.i:-1;
+    const bouts=flat(m); const secOf=[]; MATS[m].sections.forEach((sec,si)=>sec.bouts.forEach(()=>secOf.push(si)));
+    const O=order(m); let lastSec=-1;
+    O.forEach((i,p)=>{ const b=bouts[i]; const sec=MATS[m].sections[secOf[i]];
+      if(secOf[i]!==lastSec){ lastSec=secOf[i]; const h=document.createElement('div'); h.className='sec'; h.textContent=sec.label+' · '+sec.bouts.length+' bouts'+(O[p]!==(secOf[i]?MATS[m].sections.slice(0,secOf[i]).reduce((a,x)=>a+x.bouts.length,0):0)?' · starts at '+esc(b[0]):''); el.appendChild(h); }
+      {
+        const k=key(m,i), x=state[k]||{}; const ff=isF(b,x);
+        const r=document.createElement('div'); r.className='r'+(ff?' ff':'')+(x.end!=null?' done':'')+(i===live?' live':'')+(i===nu?' next':'')+(k===tk?' ours':''); r.dataset.k=k; r.style.setProperty('--mc','var(--'+m+')');
+        let chip=ff?'FF':x.end!=null?mss(x.end-x.start)+(x.start!=null?' · '+fmt(x.start):''):x.start!=null?'LIVE '+fmt(x.start):i===nu?'NEXT':(x.onMat&&x.onMat!==m?'→ '+esc(MATS[x.onMat].name):'');
+        r.innerHTML='<span class="n">'+(i+1)+'</span><span class="w">'+esc(b[0])+'</span><span class="nm '+(x.winner==='ems'?'win':x.winner==='lhms'?'lose':'')+'">'+(b[1]?esc(b[1]):'<i>forfeit</i>')+'</span><span class="nm '+(x.winner==='lhms'?'win':x.winner==='ems'?'lose':'')+'">'+(b[2]?esc(b[2]):'<i>forfeit</i>')+'</span><span class="chip">'+chip+'</span>';
+        r.addEventListener('click',()=>openEdit(k)); el.appendChild(r);
+      }
+    });
+  }
+  function renderLog(el){
+    const byK={}; Object.values(glog).forEach(g=>{ (byK[g.k]=byK[g.k]||[]).push(g); });
+    const h=document.createElement('div'); h.className='log h'; h.innerHTML='<span>Bout</span><span>#</span><span>Latest</span><span>Actual</span><span>Miss · score</span>'; el.appendChild(h);
+    const keys=Object.keys(byK).sort(); if(!keys.length){ const d=document.createElement('div'); d.className='log'; d.textContent='No guesses logged yet for this meet.'; el.appendChild(d); }
+    keys.forEach(k=>{ const L=byK[k].sort((x,y)=>x.at-y.at); const [m,i]=unkey(k); const bt=(flat(m)||[])[i]||['','?','?']; const act=boutActual(k); const last=L[L.length-1]; const sc=scoreOf(scoreRows(k));
+      const d=document.createElement('div'); d.className='log'; d.innerHTML='<span>'+esc(MATS[m].name)+' #'+(i+1)+' '+esc(bt[1]||bt[2])+'</span><span>'+L.length+'</span><span>'+fmt(last.eta)+'</span><span>'+(act!=null?fmt(act):'—')+'</span><span>'+(act!=null&&sc?((last.eta-act>0?'+':'')+(last.eta-act).toFixed(0)+'m · '+sc.score):'')+'</span>'; el.appendChild(d); });
+  }
+  function renderTabs(){ const t=$('tabs'); const want=MIDS().map(m=>m).concat(['log']); if([...t.children].map(b=>b.dataset.tab).join()!==want.join()){ t.innerHTML=''; want.forEach(id=>{ const b=document.createElement('button'); b.type='button'; b.dataset.tab=id; b.textContent=id==='log'?'Guess log':MATS[id].name+' sheet'; t.appendChild(b); }); if(!MATS[tab]&&tab!=='log') tab=MIDS()[0]; } [...t.children].forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab)); }
+  function renderWork(){ const el=$('work'); if(!el) return; el.innerHTML=''; MIDS().forEach(sh=>{ const row=document.createElement('div'); row.className='chips'; row.innerHTML='<span style="min-width:7em;font-weight:700">'+esc(MATS[sh].name)+' sheet →</span>'; MIDS().forEach(m=>{ const b=document.createElement('button'); b.type='button'; b.textContent=MATS[m].name; b.setAttribute('aria-pressed',workOf(sh).includes(m)); b.addEventListener('click',()=>{ let w=workOf(sh).slice(); if(w.includes(m)){ if(w.length>1) w=w.filter(x=>x!==m); } else w.push(m); MEET.work={...(MEET.work||{}),[sh]:w}; saveMeetDoc(); renderAll(); toast(MATS[sh].name+' sheet → '+w.map(x=>MATS[x].name).join(', ')); }); row.appendChild(b); }); el.appendChild(row); }); }
+  function renderAll(){ project(); [...document.querySelectorAll('.cards .card')].forEach(c=>{ if(!MATS[c.id.slice(5)]) c.remove(); }); MIDS().forEach(renderCard); renderTabs(); renderWork(); renderSheet(); recordSummary(); }
+
+  // ---------- actions ----------
+  document.querySelector('.cards').addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b) return; const k=b.dataset.k, a=b.dataset.a; if(!k) return; const x=state[k]||{}; const cardMat=b.closest('.card').id.slice(5);
+    if((a==='start'||a==='end')&&MEET.id!==todayId()&&!b.dataset.sure){ b.dataset.sure='1'; b.textContent='Past meet — log anyway?'; setTimeout(()=>{ delete b.dataset.sure; renderAll(); },4000); return; }
+    if(a==='start'){ commit(k,{start:nowMin(),queued:null,onMat:unkey(k)[0]===cardMat?null:cardMat},'Started #'+(unkey(k)[1]+1)); return; }
+    if(a==='end'){ commit(k,{end:nowMin()},'Ended · '+mss(nowMin()-x.start)); return; }
+    if(a==='win'){ const w=b.dataset.w; commit(k,{winner:x.winner===w?null:w}); return; }
+    if(a==='ff'){ commit(k,{forfeit:true},'Marked forfeit'); return; }
+    if(a==='edit'){ openEdit(k); return; }
+    if(a==='other'){ openPickNext(cardMat); return; }
+  });
+  // "Not this one": choose which waiting bout goes next on this mat (from either sheet)
+  function openPickNext(m){
+    let h='<h3>Who is next on '+esc(MATS[m].name)+'?</h3><div class="list">';
+    MIDS().forEach(sh=>{ const items=flat(sh).map((b,i)=>({i,b,x:state[key(sh,i)]||{}})).filter(o=>!isF(o.b,o.x)&&o.x.start==null); if(!items.length) return;
+      h+='<div class="sec" style="padding:4px 0">'+esc(MATS[sh].name)+' sheet</div>';
+      items.forEach(o=>{ h+='<button type="button" data-pick="'+key(sh,o.i)+'">#'+(o.i+1)+' · '+esc(o.b[0])+' · '+esc(o.b[1])+' vs '+esc(o.b[2])+'</button>'; }); });
+    h+='</div><div class="acts"><button type="button" data-close="1">Cancel</button></div>';
+    showDlg(h,e=>{ const p=e.target.closest('[data-pick]'); if(!p) return; const pk=p.dataset.pick; const [sh]=unkey(pk);
+      Object.keys(state).forEach(kk=>{ if(state[kk].queued&&unkey(kk)[0]===m) commit(kk,{queued:null}); });
+      commit(pk,{queued:true,onMat:sh===m?null:m},'Next on '+MATS[m].name+': #'+(unkey(pk)[1]+1)); closeDlg(); });
+  }
+  // per-bout editor (the only place times are typed)
+  function openEdit(k){
+    const [m,i]=unkey(k); const b=flat(m)[i]; const x=state[k]||{}; const locked=x.end!=null;
+    let h='<h3>#'+(i+1)+' · '+esc(b[0])+' · '+esc(b[1]||'forfeit')+' vs '+esc(b[2]||'forfeit')+'</h3>';
+    if(locked) h+='<div class="warn">This match has ended. Saving here overwrites its recorded times.</div>';
+    h+='<div class="g"><label>Start <input type="time" step="1" id="e-start" value="'+hhmmss(x.start)+'"><div class="tl"><button type="button" data-now="e-start">Now</button><button type="button" data-clr="e-start">Clear</button></div></label>'
+      +'<label>End <input type="time" step="1" id="e-end" value="'+hhmmss(x.end)+'"><div class="tl"><button type="button" data-now="e-end">Now</button><button type="button" data-clr="e-end">Clear</button></div></label></div>'
+      +'<label>Winner<div class="seg"><button type="button" data-win="ems" aria-pressed="'+(x.winner==='ems')+'">'+esc(b[1]||'—')+'</button><button type="button" data-win="lhms" aria-pressed="'+(x.winner==='lhms')+'">'+esc(b[2]||'—')+'</button></div></label>'
+      +'<div class="g"><label>Actually wrestled on<div class="seg">'+MIDS().map(mm=>'<button type="button" data-mat="'+mm+'" aria-pressed="'+((x.onMat||m)===mm)+'">'+esc(MATS[mm].name)+'</button>').join('')+'</div></label>'
+      +'<label>Forfeit<div class="seg"><button type="button" data-ff="1" aria-pressed="'+(isF(b,x))+'">Forfeit</button><button type="button" data-ff="0" aria-pressed="'+(!isF(b,x))+'">Contested</button></div></label></div>'
+      +'<div class="acts"><button type="button" data-track="1">Track this wrestler</button><button type="button" data-next="1">Make next on '+esc(MATS[m].name)+'</button><button type="button" data-first="1">Meet starts here</button><button type="button" class="danger" data-wipe="1">Clear all</button><button type="button" data-close="1">Cancel</button><button type="button" class="save" data-save="1">Save</button></div>';
+    const draft={winner:x.winner??null,onMat:x.onMat||m,forfeit:x.forfeit};
+    showDlg(h,e=>{
+      const t=e.target.closest('button'); if(!t) return;
+      if(t.dataset.now){ $(t.dataset.now).value=hhmmss(nowMin()); }
+      if(t.dataset.clr){ $(t.dataset.clr).value=''; }
+      if(t.dataset.win){ draft.winner=draft.winner===t.dataset.win?null:t.dataset.win; t.parentElement.querySelectorAll('button').forEach(q=>q.setAttribute('aria-pressed',q.dataset.win===draft.winner)); }
+      if(t.dataset.mat){ draft.onMat=t.dataset.mat; t.parentElement.querySelectorAll('button').forEach(q=>q.setAttribute('aria-pressed',q.dataset.mat===draft.onMat)); }
+      if(t.dataset.ff){ draft.forfeit=t.dataset.ff==='1'; t.parentElement.querySelectorAll('button').forEach(q=>q.setAttribute('aria-pressed',(q.dataset.ff==='1')===draft.forfeit)); }
+      if(t.dataset.track){ selectTrack(m+'|'+i,b[1]||b[2]); closeDlg(); }
+      if(t.dataset.next){ Object.keys(state).forEach(kk=>{ if(state[kk].queued&&unkey(kk)[0]===m) commit(kk,{queued:null}); }); commit(k,{queued:true},'Next: #'+(i+1)); closeDlg(); }
+      if(t.dataset.first){ MEET.startAt={...(MEET.startAt||{}),[m]:i}; saveMeetDoc(); renderAll(); toast(MATS[m].name+' starts at #'+(i+1)); closeDlg(); }
+      if(t.dataset.wipe){ if(t.textContent!=='Really clear?'){ t.textContent='Really clear?'; return; } commit(k,{start:null,end:null,winner:null,queued:null,onMat:null,forfeit:null},'Cleared #'+(i+1)); closeDlg(); }
+      if(t.dataset.save){ const s=toMin($('e-start').value), en=toMin($('e-end').value); commit(k,{start:s,end:en,winner:draft.winner,onMat:draft.onMat===m?null:draft.onMat,forfeit:draft.forfeit===undefined?null:draft.forfeit},'Saved #'+(i+1)); closeDlg(); }
+    });
+  }
+  // ---------- meets: history, priors, new meet, roster entry ----------
+  // meets/<id> doc = {id,title,start,mats,track,split,prior:{m1:{dur,gap},m2:{dur,gap},slip},summary:{m1:{dur,gap,n},m2:{...},slip,bouts,updatedAtMs}}
+  // config/current = {id}. The app writes the running summary once a minute; a new meet's prior is the average of all summaries.
+  let meetsIdx={}; let lastSummary=0;
+  function meetDoc(){ return {...(meetsIdx[MEET.id]||{}),id:MEET.id,title:MEET.title,start:MEET.start,mats:MATS,track:MEET.track,startWt:MEET.startWt||null,startAt:MEET.startAt||null,work:MEET.work||null,prior:MEET.prior||null,summary:(meetsIdx[MEET.id]||{}).summary||null,updatedAtMs:Date.now()}; }
+  function saveMeetDoc(){ const d=meetDoc(); meetsIdx[MEET.id]=d; try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){} if(db) db.collection('meets').doc(MEET.id).set(d).catch(()=>{}); }
+  function statsAll(m){ // whole-meet version of stats(): every timed bout on the mat
+    const rows=onMat(m); let d=[],g=[];
+    rows.forEach((r,k)=>{ const x=r.x; if(x.start!=null&&x.end!=null&&x.end>=x.start&&x.end-x.start<15) d.push(x.end-x.start);
+      const p=rows[k-1]; if(x.start!=null&&p&&p.x.end!=null&&x.start>=p.x.end&&x.start-p.x.end<30) g.push(x.start-p.x.end); });
+    const mean=a=>a.reduce((x,y)=>x+y,0)/a.length; return {dur:d.length?mean(d):0,gap:g.length?mean(g):0,nd:d.length,ng:g.length};
+  }
+  function meetSummary(){
+    const out={bouts:Object.keys(state).filter(k=>state[k].start!=null).length,updatedAtMs:Date.now()};
+    MIDS().forEach(m=>{ const st=statsAll(m); if(st.nd>=2) out[m]={dur:+st.dur.toFixed(2),gap:+(st.ng?st.gap:0).toFixed(2),n:st.nd}; });
+    const sch=toMin(MEET.start||'16:30'); const starts=Object.values(state).filter(x=>x.start!=null).map(x=>x.start).filter(t=>sch!=null&&t>=sch-45&&t<=sch+240); const first=Math.min(...starts);
+    if(isFinite(first)&&sch!=null) out.slip=+(first-sch).toFixed(1);
+    return out;
+  }
+  const todayId=()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  function recordSummary(){ if(!db||Date.now()-lastSummary<60000||MEET.id!==todayId()) return; const sm=meetSummary(); if(!MIDS().some(m=>sm[m])) return; lastSummary=Date.now(); meetsIdx[MEET.id]={...(meetsIdx[MEET.id]||{}),summary:sm}; try{ db.collection('meets').doc(MEET.id).update({summary:sm}).catch(()=>{}); }catch(e){} }
+  function priorsFromHistory(){
+    const S=Object.values(meetsIdx).map(x=>x.summary).filter(x=>x&&MIDS().some(m=>x[m])); const pr={};
+    const all=S.flatMap(x=>Object.keys(x).filter(k=>/^m\d/.test(k)).map(k=>x[k])).filter(Boolean);
+    if(all.length) pr.all={dur:+(all.reduce((a,b)=>a+b.dur,0)/all.length).toFixed(2),gap:+(all.reduce((a,b)=>a+b.gap,0)/all.length).toFixed(2),n:all.length};
+    const sl=S.map(x=>x.slip).filter(x=>x!=null&&Math.abs(x)<=45); pr.slip=sl.length?+(sl.reduce((a,b)=>a+b,0)/sl.length).toFixed(1):15; pr.from=S.length; return pr;
+  }
+  // Roster text: one bout per line "wt  Eagle name  |  Opponent name" (separator: |, tab, or 2+ spaces). A line "## Label" starts a section. Blank side = forfeit.
+  function parseRoster(txt){
+    const sections=[]; let cur=null;
+    txt.split('\n').map(l=>l.trim()).filter(Boolean).forEach(l=>{
+      if(/^#+\s*/.test(l)){ cur={label:l.replace(/^#+\s*/,''),bouts:[]}; sections.push(cur); return; }
+      if(!cur){ cur={label:'Bouts',bouts:[]}; sections.push(cur); }
+      const m=l.match(/^(\S+)\s+(.*)$/); if(!m) return; const wt=/^\d+$/.test(m[1])?+m[1]:m[1]; let rest=m[2];
+      let parts=rest.includes('|')?rest.split('|'):rest.includes('\t')?rest.split('\t'):rest.split(/\s{2,}/);
+      parts=parts.map(x=>x.trim()); if(parts.length===1){ const w=parts[0].split(/\s+/); parts=w.length>=4?[w.slice(0,2).join(' '),w.slice(2).join(' ')]:[parts[0],'']; }
+      cur.bouts.push([wt,parts[0]||'',parts[1]||'']);
+    });
+    return sections;
+  }
+  function rosterText(mat){ return (mat.sections||[]).map(sec=>'## '+sec.label+'\n'+sec.bouts.map(b=>b[0]+'  '+(b[1]||'')+' | '+(b[2]||'')).join('\n')).join('\n'); }
+  async function loadMeetsIdx(){ if(!db) return; try{ const ms=await db.collection('meets').get(); ms.docs.forEach(d=>{ meetsIdx[d.id]=d.data()||{}; }); }catch(e){} }
+  async function switchMeet(id){
+    const c=meetsIdx[id]; if(!c||!c.mats){ toast('No roster stored for '+id); return; }
+    MEET={id:c.id||id,title:c.title,start:c.start,track:c.track,prior:c.prior||null,startWt:c.startWt||null,startAt:c.startAt||null,work:c.work||null}; MATS=c.mats;
+    try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){}
+    state={}; glog={}; buildRoster(); loadLocal(); renderAll();
+    if(db){ try{ const snap=await db.collection(BOUTS()).get(); mergeSnap(snap); const gs=await db.collection(GLOG()).get(); gs.docs.forEach(d=>{ glog[d.id]=d.data(); }); mirror(); }catch(e){} subscribe(); renderAll(); }
+    toast('Viewing '+MEET.title);
+  }
+  function openMeets(){
+    const ids=Object.keys(meetsIdx).sort().reverse();
+    let h='<h3>Meets</h3><div class="list">';
+    ids.forEach(id=>{ const x=meetsIdx[id]; const sm=x.summary||{}; const cur=id===MEET.id;
+      h+='<div class="meetrow"><div><b>'+esc(x.title||id)+'</b>'+(cur?' · viewing':'')+'<small>'+(sm.m1?'Mat 1 '+mss(sm.m1.dur)+'+'+mss(sm.m1.gap)+' · ':'')+(sm.m2?'Mat 2 '+mss(sm.m2.dur)+'+'+mss(sm.m2.gap)+' · ':'')+(sm.bouts?sm.bouts+' bouts timed':'no timing yet')+(sm.slip!=null?' · first whistle '+(sm.slip>=0?'+':'')+sm.slip+' min':'')+'</small></div>'
+        +'<button type="button" data-open="'+id+'">Open</button><button type="button" data-cur="'+id+'"'+(cur?' disabled':'')+'>Set current</button></div>'; });
+    if(!ids.length) h+='<div class="meetrow">No meets stored yet.</div>';
+    const pr=priorsFromHistory();
+    h+='</div><div class="warn" style="border-color:var(--line)">Priors for a new meet (from '+pr.from+' past meet'+(pr.from===1?'':'s')+'): '+(pr.all?'mat '+mss(pr.all.dur)+' + setup '+mss(pr.all.gap):'defaults')+' · first whistle '+(pr.slip>=0?'+':'')+pr.slip+' min</div>'
+      +'<div class="acts"><button type="button" data-edit="1">Edit this roster</button><button type="button" class="save" data-new="1">New meet</button><button type="button" data-close="1">Close</button></div>';
+    showDlg(h,e=>{ const t=e.target.closest('button'); if(!t) return;
+      if(t.dataset.open){ closeDlg(); switchMeet(t.dataset.open); }
+      if(t.dataset.cur){ if(!db){ toast('Shared data is not connected'); return; } db.collection('config').doc('current').set({id:t.dataset.cur,updatedAtMs:Date.now()}).then(()=>{ toast('Current meet set'); closeDlg(); switchMeet(t.dataset.cur); }).catch(err=>toast('Failed: '+(err.code||err.message))); }
+      if(t.dataset.new) openNewMeet(null);
+      if(t.dataset.edit) openNewMeet(MEET.id);
+    });
+  }
+  function openNewMeet(editId){
+    const ex=editId?meetsIdx[editId]:null; const pr=ex?(ex.prior||priorsFromHistory()):priorsFromHistory();
+    const today=new Date(); const iso=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+    const mats=ex?ex.mats:{m1:{name:'Mat 1',sections:[]},m2:{name:'Mat 2',sections:[]}}; const nMats=Object.keys(mats).length;
+    const matBlocks=n=>Array.from({length:n},(_,q)=>{ const id='m'+(q+1); const mat=mats[id]||{name:'Mat '+(q+1),sections:[]}; return '<div style="border-top:1px solid var(--line);padding-top:8px"><label>'+esc(mat.name)+' sheet photo(s) <input type="file" id="nm-ph-'+id+'" accept="image/*" multiple></label><label>'+esc(mat.name)+' sheet (one bout per line: weight, Eagle name | opponent name; "## Varsity" starts a section)<textarea id="nm-'+id+'" placeholder="## JV&#10;85  Colton Licht | Gemonie Abney">'+esc(rosterText(mat))+'</textarea></label></div>'; }).join('');
+    let h='<h3>'+(ex?'Edit meet':'New meet')+'</h3><div class="g"><label>Opponent / title <input id="nm-title" value="'+esc(ex?ex.title:'Eagle vs ')+'"></label><label>Date <input type="date" id="nm-date" value="'+esc(ex?ex.id:iso)+'"'+(ex?' disabled':'')+'></label>'
+      +'<label>Scheduled start <input type="time" id="nm-start" value="'+esc(ex?ex.start:'16:30')+'"></label><label>Starting weight class (blank = lightest) <input type="number" id="nm-startwt" min="60" max="300" value="'+esc(ex&&ex.startWt?ex.startWt:'')+'" placeholder="e.g. 110"></label>'
+      +'<label>Number of mats <select id="nm-nmats">'+[1,2,3,4,5,6].map(n=>'<option value="'+n+'"'+(n===nMats?' selected':'')+'>'+n+'</option>').join('')+'</select></label></div>'
+      +'<div id="nm-ocr" class="hint" style="font-size:12px;color:var(--muted)">Snap or pick a photo per mat; the rows appear below for a quick check. Mats with an empty sheet are fine (they can work another sheet via Settings).</div>'
+      +'<div id="nm-mats">'+matBlocks(nMats)+'</div>'
+      +'<div class="warn" style="border-color:var(--line)">Starting assumptions from history: '+(pr.all?'mat '+mss(pr.all.dur)+' + setup '+mss(pr.all.gap)+' per bout (pooled over '+pr.all.n+' mat-meets) · ':'')+'first whistle '+(pr.slip>=0?'+':'')+pr.slip+' min. Replaced by live numbers as bouts are timed.</div>'
+      +'<div id="nm-preview" class="hint" style="font-size:12px;color:var(--muted)"></div>'
+      +'<div class="acts"><button type="button" data-back="1">Back</button><button type="button" class="save" data-create="1">'+(ex?'Save roster':'Create and make current')+'</button></div>';
+    showDlg(h,async e=>{ const t=e.target.closest('button'); if(!t) return;
+      if(t.dataset.back){ openMeets(); return; }
+      if(t.dataset.create){
+        const n=+$('nm-nmats').value; const parsed={}; let total=0;
+        for(let q=1;q<=n;q++){ const id='m'+q; const secs=parseRoster($('nm-'+id).value); parsed[id]={name:(mats[id]&&mats[id].name)||('Mat '+q),sections:secs}; total+=secs.reduce((a,s)=>a+s.bouts.length,0); }
+        const id=ex?ex.id:$('nm-date').value; if(!id){ $('nm-preview').textContent='Pick a date.'; toast('Pick a date'); return; }
+        if(!total&&!t.dataset.confirmed){ t.dataset.confirmed='1'; t.textContent='No bouts yet — create anyway? (add sheets later via Meets → Edit)'; return; }
+        const firstWith=Object.keys(parsed).find(k=>parsed[k].sections.some(s=>s.bouts.length))||'m1';
+        const doc={id,title:$('nm-title').value.trim()||('Meet '+id),start:$('nm-start').value||'16:30',startWt:+$('nm-startwt').value||null,startAt:ex?ex.startAt||null:null,work:ex?ex.work||null:null,mats:parsed,prior:pr,track:ex?ex.track:(firstWith+'|0'),summary:ex?ex.summary||null:null,updatedAtMs:Date.now()};
+        const findTrack=name=>{ for(const m of Object.keys(doc.mats)){ const i=doc.mats[m].sections.flatMap(s=>s.bouts).findIndex(b=>b[1]===name||b[2]===name); if(i>=0) return m+'|'+i; } return null; };
+        const keep=findTrack('Oliver Swenson'); if(keep) doc.track=keep;
+        if(!db){ $('nm-preview').textContent='Sign in to save a meet.'; toast('Not signed in'); return; }
+        t.disabled=true; t.textContent='Saving…';
+        try{ await db.collection('meets').doc(id).set(doc); meetsIdx[id]=doc; if(!ex) await db.collection('config').doc('current').set({id,updatedAtMs:Date.now()}); }
+        catch(err){ t.disabled=false; t.textContent=ex?'Save roster':'Create and make current'; $('nm-preview').textContent='Save failed: '+(err.code||err.message); toast('Save failed: '+(err.code||err.message)); return; }
+        closeDlg(); await switchMeet(id); toast((ex?'Roster saved · ':'Meet created · ')+total+' bouts');
+      }
+    });
+    const prev=()=>{ const n=+$('nm-nmats').value; const parts=[]; for(let q=1;q<=n;q++){ const el=$('nm-m'+q); if(!el) continue; const a=parseRoster(el.value); parts.push('Mat '+q+' '+a.reduce((x,s)=>x+s.bouts.length,0)+' bouts / '+a.length+' section'+(a.length===1?'':'s')); } $('nm-preview').textContent='Parsed: '+parts.join(' · '); };
+    const ocr=async(fileInput,target)=>{
+      const files=[...fileInput.files||[]]; if(!files.length) return;
+      const sample=await window.claude?.use?.('sample'); if(!sample){ $('nm-ocr').textContent='Photo reading needs the Claude viewer; type the sheet instead.'; return; }
+      $('nm-ocr').textContent='Reading '+files.length+' photo'+(files.length===1?'':'s')+'… (10–60 s)'; fileInput.disabled=true;
+      const prompt='These photos are a middle-school wrestling dual-meet bout sheet, one or more pages in order. Transcribe EVERY row into exactly this text format, nothing else:\n'
+        +'## <section label>   (a line like this whenever the sheet shows a heading such as Varsity, Junior Varsity, JV, or a new table; if there is no heading use "## Bouts")\n'
+        +'<weight>  <left column name> | <right column name>\n'
+        +'Rules: keep the printed row order across pages; weight is the number in the first column (write HVY if it says HVY); if a weight is missing write ?; if a side is blank write nothing on that side but keep the | ; keep (EMS)/(LHMS) tags on names; do not merge or skip rows; do not add commentary.';
+      try{ const {text}=await sample(prompt,{images:files,modelTier:'default',cache:false}); const lines=text.split('\n').filter(l=>/^(##|\S+\s)/.test(l.trim())).join('\n'); $(target).value=lines; prev(); $('nm-ocr').textContent='Read '+files.length+' photo'+(files.length===1?'':'s')+'. Check the rows, then Create.'; }
+      catch(e){ $('nm-ocr').textContent=(e.code==='not_granted'?'Claude access declined; type the sheet instead.':e.code==='images_unavailable'?'This build cannot send photos; type the sheet instead.':'Photo read failed ('+(e.code||e.message)+'); try again or type it.'); }
+      fileInput.disabled=false;
+    };
+    const wire=()=>{ const n=+$('nm-nmats').value; for(let q=1;q<=n;q++){ const id='m'+q; const ph=$('nm-ph-'+id), ta=$('nm-'+id); if(ph&&!ph.dataset.w){ ph.dataset.w='1'; ph.addEventListener('change',()=>ocr(ph,'nm-'+id)); } if(ta&&!ta.dataset.w){ ta.dataset.w='1'; ta.addEventListener('input',prev); } } };
+    $('nm-nmats').addEventListener('change',()=>{ const n=+$('nm-nmats').value; const keep={}; for(let q=1;q<=6;q++){ const ta=$('nm-m'+q); if(ta) keep['m'+q]=ta.value; } $('nm-mats').innerHTML=matBlocks(n); for(let q=1;q<=n;q++){ if(keep['m'+q]!=null) $('nm-m'+q).value=keep['m'+q]; } wire(); prev(); });
+    wire(); prev();
+  }
+  $('meetTitle').addEventListener('click',openMeets);
+  $('meetStart').addEventListener('click',()=>{
+    const h='<h3>Scheduled start</h3><div class="warn">This time was set when the meet was created. Changing it moves every guess for every parent, and the first-whistle history for this meet is measured against it. Change only if the schedule itself changed.</div>'
+      +'<label>New scheduled start <input type="time" id="ms-time" value="'+esc(MEET.start||'16:30')+'"></label><div class="acts"><button type="button" data-close="1">Cancel</button><button type="button" class="save" data-set="1">Change start time</button></div>';
+    showDlg(h,e=>{ const t=e.target.closest('button'); if(!t||!t.dataset.set) return; const v=$('ms-time').value; if(!v) return; MEET.start=v; $('startTime').value=v; saveMeetDoc(); buildRoster(); renderAll(); toast('Start time now '+fmt(toMin(v))); closeDlg(); });
+  });
+  $('startTime').addEventListener('change',()=>{ MEET.start=$('startTime').value||MEET.start; saveMeetDoc(); $('meetStart').textContent='Starts '+fmt(toMin(MEET.start)); });
+  $('meetsBtn').addEventListener('click',openMeets);
+  $('newMeetBtn').addEventListener('click',()=>openNewMeet(null));
+  let dlgHandler=null;
+  function showDlg(html,handler){ $('dlg').innerHTML=html; $('modal').classList.add('open'); dlgHandler=handler; }
+  function closeDlg(){ $('modal').classList.remove('open'); dlgHandler=null; }
+  $('dlg').addEventListener('click',e=>{ if(e.target.closest('[data-close]')){ closeDlg(); return; } if(dlgHandler) dlgHandler(e); });
+  $('modal').addEventListener('click',e=>{ if(e.target===$('modal')) closeDlg(); });
+  $('tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; tab=b.dataset.tab; renderTabs(); renderSheet(); });
+
+  // ---------- roster / tracking ----------
+  const NAMES=[];
+  function buildRoster(){
+    $('track').innerHTML=''; $('names').innerHTML=''; NAMES.length=0;
+    MIDS().forEach(m=>flat(m).forEach((b,i)=>{ const o=document.createElement('option'); o.value=m+'|'+i; o.textContent=MATS[m].name+' #'+(i+1)+' '+b[1]+' / '+b[2]; $('track').appendChild(o); [b[1],b[2]].forEach(n=>{ if(n) NAMES.push({n,v:m+'|'+i}); }); }));
+    NAMES.forEach(x=>{ const o=document.createElement('option'); o.value=x.n; $('names').appendChild(o); });
+    $('track').value=MEET.track||$('track').options[0]?.value||'';
+    { const me=NAMES.find(x=>x.n.replace(/\*/g,'').trim().toLowerCase()==='oliver swenson'); if(me) $('track').value=me.v; }
+    { const [m,i]=$('track').value.split('|'); const b=flat(m)[+i]; const mine=b&&[b[1],b[2]].find(n=>n&&/oliver swenson/i.test(n)); $('find').value=b?(mine||b[1]||b[2]):''; }
+    $('startTime').value=MEET.start||'16:30'; $('meetTitle').textContent=MEET.title||MEET.id; $('meetStart').textContent='Starts '+fmt(toMin(MEET.start||'16:30'));
+  }
+  function selectTrack(v,label){ $('track').value=v; $('find').value=label||''; try{ localStorage.setItem(LS('track'),v); }catch(e){} renderAll(); toast('Tracking '+label); }
+  function findName(q,exactOnly){ q=(q||'').trim().toLowerCase(); if(q.length<2) return false;
+    if(/^\d{2,3}$/.test(q)){ const w=+q; for(const m of MIDS().slice().reverse()){ const i=flat(m).findIndex(b=>+b[0]===w); if(i>=0){ selectTrack(m+'|'+i,w+' lb ('+(flat(m)[i][1]||flat(m)[i][2])+')'); return true; } } return false; } const toks=q.split(/\s+/).filter(Boolean); const hit=NAMES.find(x=>x.n.toLowerCase()===q)||(!exactOnly&&(NAMES.find(x=>x.n.toLowerCase().includes(q))||NAMES.find(x=>{ const n=x.n.toLowerCase(); return toks.every(t=>n.includes(t)); })||NAMES.find(x=>{ const n=x.n.toLowerCase(); return toks.some(t=>t.length>=4&&n.includes(t)); }))); if(hit){ selectTrack(hit.v,hit.n); return true; } return false; }
+  $('find').addEventListener('input',e=>findName(e.target.value,true));
+  $('find').addEventListener('change',e=>findName(e.target.value,false));
+  $('find').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); findName(e.target.value,false); e.target.blur(); } });
+  $('clearFind').addEventListener('click',()=>{ $('find').value=''; $('find').focus(); });
+  $('go').addEventListener('click',async()=>{ const q=$('find').value; if(!findName(q,false)&&q.trim()){ toast('No wrestler matches "'+q+'"'); return; } await hardRefresh(); });
+  ['rate','startTime','skipped'].forEach(id=>{ $(id).addEventListener('input',renderAll); $(id).addEventListener('change',renderAll); });
+
+  // ---------- sync ----------
+  async function hardRefresh(){
+    const btn=$('refresh'); btn.disabled=true; btn.textContent='…';
+    if(db){ try{ const snap=await Promise.race([db.collection(BOUTS()).get(), new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000))]); mergeSnap(snap);
+        const gs=await db.collection(GLOG()).get(); gs.docs.forEach(d=>{ glog[d.id]=d.data(); }); mirror();
+        $('status').textContent='Refreshed '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'})+' · '+snap.docs.length+' rows'; }
+      catch(e){ $('status').textContent='Refresh failed: '+(e.code||e.message); } }
+    renderAll(); $('hdr').classList.add('flash'); setTimeout(()=>$('hdr').classList.remove('flash'),500); btn.disabled=false; btn.textContent='Refresh';
+  }
+  $('refresh').addEventListener('click',hardRefresh);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') hardRefresh(); });
+  // live tick: elapsed clocks and the now-floor on the projection, once a second; full redraw every 20 s
+  setInterval(()=>{ MIDS().forEach(m=>{ const M=matModel(m,0); const c=$('clk-'+m); if(c&&M.live) c.textContent=mss(nowMin()-M.live.x.start); }); project(); },1000);
+  setInterval(()=>{ if(!$('modal').classList.contains('open')) renderAll(); },20000);
+
+  let unsub=null;
+  function subscribe(){ if(!db) return; try{ if(unsub) unsub(); }catch(e){} try{ unsub=db.collection(BOUTS()).onSnapshot(snap=>{ mergeSnap(snap); if(!$('modal').classList.contains('open')) renderAll(); else project(); $('status').textContent='Live · '+(MEET.title||MEET.id)+' · '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'}); },err=>{ $('status').textContent='Sync error: '+(err.code||err.message); }); }catch(e){ $('status').textContent='Sync unavailable: '+(e.code||e.message); } }
+  buildRoster(); loadLocal(); renderAll();
+  (async()=>{
+    db=window.MT_DB||await window.claude?.use?.('db');
+    if(!db){ $('status').textContent='Not connected to shared data: saving on this phone only.'; return; }
+    await loadMeetsIdx();
+    try{ const cfg=await db.collection('config').doc('current').get(); const c=cfg&&cfg.exists!==false?(cfg.data?cfg.data():cfg):null;
+      let cur=c&&c.id?c.id:null;
+      if(c&&c.mats&&!meetsIdx[c.id]){ meetsIdx[c.id]=c; }   // older full-config doc
+      if(cur&&meetsIdx[cur]&&meetsIdx[cur].mats&&(cur!==MEET.id||JSON.stringify(meetsIdx[cur].mats)!==JSON.stringify(MATS))){ const x=meetsIdx[cur]; MEET={id:x.id||cur,title:x.title,start:x.start,track:x.track,prior:x.prior||null,startWt:x.startWt||null,startAt:x.startAt||null,work:x.work||null}; MATS=x.mats; try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){} state={}; glog={}; buildRoster(); loadLocal(); renderAll(); }
+      else if(cur===MEET.id&&meetsIdx[cur]&&meetsIdx[cur].prior&&!MEET.prior){ MEET.prior=meetsIdx[cur].prior; }
+    }catch(e){ $('status').textContent='Roster read failed: '+(e.code||e.message); }
+    try{ const s0=await db.collection(BOUTS()).get(); const have={}; s0.docs.forEach(d=>{ have[d.id]=1; }); mergeSnap(s0); Object.keys(state).forEach(k=>{ if(!have[k]) queue[k]=1; }); mirror(); }catch(e){}
+    flush();
+    try{ const gs=await db.collection(GLOG()).get(); gs.docs.forEach(d=>{ glog[d.id]=d.data(); }); mirror(); }catch(e){}
+    subscribe();
+  })();
+})();
+</script>
+
+</body></html>
