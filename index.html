@@ -1,5 +1,13 @@
 <html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Mat Time</title>
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mat Time">
+<meta name="theme-color" content="#16181d">
+<style>#status[data-flo]::after{content:" · " attr(data-flo)}</style>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Barlow:wght@400;500;600;700&display=swap">
 <style>
@@ -162,9 +170,17 @@ window.MT_CONFIG={url:'https://neasjlyymaufxxpprduv.supabase.co',key:'sb_publish
 window.MT_DB=(function(){
   var c=window.MT_CONFIG; if(!c||!c.key) return null;
   var base=c.url+'/rest/v1/docs', H={apikey:c.key,Authorization:'Bearer '+c.key,'Content-Type':'application/json'};
+  var memPin='';
+  function pin(){ try{ return localStorage.getItem('mt.pin')||memPin; }catch(e){ return memPin; } }
+  function setPin(v){ memPin=v||''; try{ if(v) localStorage.setItem('mt.pin',v); else localStorage.removeItem('mt.pin'); }catch(e){} }
+  window.MT_HASPIN=function(){ return !!pin(); };
+  window.MT_NEEDPIN=function(){ if(pin()) return true; var v=window.prompt('Meet PIN (needed to make changes)'); if(v&&v.trim()){ setPin(v.trim()); return true; } return false; };
   function req(method,qs,body,extra){
-    return fetch(base+qs,{method:method,headers:Object.assign({},H,extra||{}),body:body?JSON.stringify(body):undefined}).then(function(r){
-      return r.text().then(function(t){ if(!r.ok){ var e=new Error(t||String(r.status)); e.code=r.status; throw e; } return t?JSON.parse(t):null; }); });
+    var write=method!=='GET', pv=pin();
+    if(write&&!pv){ if(/guesslog/.test(qs)||(body&&/guesslog/.test(body.path||''))) return Promise.resolve(null); var le=new Error('view only'); le.code='PIN needed'; return Promise.reject(le); }
+    var hd=Object.assign({},H,extra||{}); if(pv) hd['x-mt-pin']=pv;
+    return fetch(base+qs,{method:method,headers:hd,body:body?JSON.stringify(body):undefined}).then(function(r){
+      return r.text().then(function(t){ if(!r.ok){ var e=new Error(t||String(r.status)); e.code=r.status; if(write&&(r.status===401||r.status===403)){ setPin(''); e.code='wrong PIN'; } throw e; } return t?JSON.parse(t):null; }); });
   }
   function snapDoc(row){ return {id:row.id,exists:true,data:function(){return row.data;}}; }
   function upsert(path,id,d){ return req('POST','?on_conflict=path',{path:path+'/'+id,coll:path,id:id,data:d,updated_at:new Date().toISOString()},{Prefer:'resolution=merge-duplicates,return=minimal'}); }
@@ -274,6 +290,7 @@ window.MT_DB=(function(){
   }
   // The one write path. Everything that changes a bout goes through here, and everything re-renders after it.
   function commit(k,patch,msg){
+    if(window.MT_DB&&window.MT_NEEDPIN&&!window.MT_NEEDPIN()){ toast('View only: PIN needed to make changes'); return; }
     const cur={...(state[k]||{}),...patch,updatedAtMs:Date.now()};
     Object.keys(cur).forEach(f=>{ if(cur[f]===null||cur[f]===undefined) delete cur[f]; });
     state[k]=cur; mirror(); queue[k]=1; flush(); renderAll(); if(msg) toast(msg);
@@ -331,7 +348,7 @@ window.MT_DB=(function(){
     const who=(()=>{ const q=($('find').value||'').trim().toLowerCase(); const b=bouts[N]; const hit=[b[1],b[2]].find(n=>n&&q&&n.toLowerCase().includes(q)); return hit||b[2]||b[1]; })();
     $('boardLbl').textContent=who+' · '+MATS[tm].name+' #'+(N+1);
     if(own.start!=null){ $('upText').textContent=own.end!=null?'DONE':'LIVE'; $('upSub').textContent=(own.end!=null?'wrestled':'on the mat')+' · '+MATS[own.onMat||tm].name; $('winText').textContent=fmts(own.start); $('etaText').textContent=fmt(own.start); $('noteText').textContent='Started '+fmts(own.start)+(own.end!=null?' · lasted '+mss(own.end-own.start):' · '+mss(now-own.start)+' elapsed')+'.'; renderScore(gk); return; }
-    if(isF(bouts[N],own)){ $('upText').textContent='FF'; $('upSub').textContent='forfeit'; $('winText').textContent='Forfeit'; $('etaText').textContent='—'; $('noteText').textContent='Marked forfeit; no bout to time.'; renderScore(gk); return; }
+    if(isF(bouts[N],own)){ const fl=own&&own.flo; $('upText').textContent=fl?'DONE':'FF'; $('upSub').textContent=fl?'finished on Flo':'forfeit'; $('winText').textContent=fl?'Finished':'Forfeit'; $('etaText').textContent='—'; $('noteText').textContent=fl?('FloWrestling shows this bout finished ('+fl+').'):'Marked forfeit; no bout to time.'; renderScore(gk); return; }
     const M=matModel(tm,r0); const pace=M.dur+M.gap;
     const secOf=[]; MATS[tm].sections.forEach((sec,si)=>sec.bouts.forEach(()=>secOf.push(si)));
     const O=order(tm); const P=i=>O.indexOf(i); const PN=P(N);
@@ -412,7 +429,7 @@ window.MT_DB=(function(){
       {
         const k=key(m,i), x=state[k]||{}; const ff=isF(b,x);
         const r=document.createElement('div'); r.className='r'+(ff?' ff':'')+(x.end!=null?' done':'')+(i===live?' live':'')+(i===nu?' next':'')+(k===tk?' ours':''); r.dataset.k=k; r.style.setProperty('--mc','var(--'+m+')');
-        let chip=ff?'FF':x.end!=null?mss(x.end-x.start)+(x.start!=null?' · '+fmt(x.start):''):x.start!=null?'LIVE '+fmt(x.start):i===nu?'NEXT':(x.onMat&&x.onMat!==m?'→ '+esc(MATS[x.onMat].name):'');
+        let chip=x.flo?('FLO '+esc(x.flo)):ff?'FF':x.end!=null?mss(x.end-x.start)+(x.start!=null?' · '+fmt(x.start):''):x.start!=null?'LIVE '+fmt(x.start):i===nu?'NEXT':(x.onMat&&x.onMat!==m?'→ '+esc(MATS[x.onMat].name):'');
         r.innerHTML='<span class="n">'+(i+1)+'</span><span class="w">'+esc(b[0])+'</span><span class="nm '+(x.winner==='ems'?'win':x.winner==='lhms'?'lose':'')+'">'+(b[1]?esc(b[1]):'<i>forfeit</i>')+'</span><span class="nm '+(x.winner==='lhms'?'win':x.winner==='ems'?'lose':'')+'">'+(b[2]?esc(b[2]):'<i>forfeit</i>')+'</span><span class="chip">'+chip+'</span>';
         r.addEventListener('click',()=>openEdit(k)); el.appendChild(r);
       }
@@ -482,7 +499,7 @@ window.MT_DB=(function(){
   // config/current = {id}. The app writes the running summary once a minute; a new meet's prior is the average of all summaries.
   let meetsIdx={}; let lastSummary=0;
   function meetDoc(){ return {...(meetsIdx[MEET.id]||{}),id:MEET.id,title:MEET.title,start:MEET.start,mats:MATS,track:MEET.track,startWt:MEET.startWt||null,startAt:MEET.startAt||null,work:MEET.work||null,prior:MEET.prior||null,summary:(meetsIdx[MEET.id]||{}).summary||null,updatedAtMs:Date.now()}; }
-  function saveMeetDoc(){ const d=meetDoc(); meetsIdx[MEET.id]=d; try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){} if(db) db.collection('meets').doc(MEET.id).set(d).catch(()=>{}); }
+  function saveMeetDoc(){ if(window.MT_DB&&window.MT_NEEDPIN&&!window.MT_NEEDPIN()){ toast('View only: PIN needed to make changes'); return; } const d=meetDoc(); meetsIdx[MEET.id]=d; try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){} if(db) db.collection('meets').doc(MEET.id).set(d).catch(()=>{}); }
   function statsAll(m){ // whole-meet version of stats(): every timed bout on the mat
     const rows=onMat(m); let d=[],g=[];
     rows.forEach((r,k)=>{ const x=r.x; if(x.start!=null&&x.end!=null&&x.end>=x.start&&x.end-x.start<15) d.push(x.end-x.start);
@@ -550,7 +567,7 @@ window.MT_DB=(function(){
     const mats=ex?ex.mats:{m1:{name:'Mat 1',sections:[]},m2:{name:'Mat 2',sections:[]}}; const nMats=Object.keys(mats).length;
     const matBlocks=n=>Array.from({length:n},(_,q)=>{ const id='m'+(q+1); const mat=mats[id]||{name:'Mat '+(q+1),sections:[]}; return '<div style="border-top:1px solid var(--line);padding-top:8px"><label>'+esc(mat.name)+' sheet photo(s) <input type="file" id="nm-ph-'+id+'" accept="image/*" multiple></label><label>'+esc(mat.name)+' sheet (one bout per line: weight, Eagle name | opponent name; "## Varsity" starts a section)<textarea id="nm-'+id+'" placeholder="## JV&#10;85  Colton Licht | Gemonie Abney">'+esc(rosterText(mat))+'</textarea></label></div>'; }).join('');
     let h='<h3>'+(ex?'Edit meet':'New meet')+'</h3><div class="g"><label>Opponent / title <input id="nm-title" value="'+esc(ex?ex.title:'Eagle vs ')+'"></label><label>Date <input type="date" id="nm-date" value="'+esc(ex?ex.id:iso)+'"'+(ex?' disabled':'')+'></label>'
-      +'<label>Scheduled start <input type="time" id="nm-start" value="'+esc(ex?ex.start:'16:30')+'"></label><label>Starting weight class (blank = lightest) <input type="number" id="nm-startwt" min="60" max="300" value="'+esc(ex&&ex.startWt?ex.startWt:'')+'" placeholder="e.g. 110"></label>'
+      +'<label>FloWrestling links (optional: paste the JV and Varsity event links) <input id="nm-flo" placeholder="https://www.flowrestling.org/events/..." value="'+esc(ex&&ex.flo?ex.flo.map(x=>'https://www.flowrestling.org/events/'+x).join(' '):'')+'"></label><label>Scheduled start <input type="time" id="nm-start" value="'+esc(ex?ex.start:'16:30')+'"></label><label>Starting weight class (blank = lightest) <input type="number" id="nm-startwt" min="60" max="300" value="'+esc(ex&&ex.startWt?ex.startWt:'')+'" placeholder="e.g. 110"></label>'
       +'<label>Number of mats <select id="nm-nmats">'+[1,2,3,4,5,6].map(n=>'<option value="'+n+'"'+(n===nMats?' selected':'')+'>'+n+'</option>').join('')+'</select></label></div>'
       +'<div id="nm-ocr" class="hint" style="font-size:12px;color:var(--muted)">Snap or pick a photo per mat; the rows appear below for a quick check. Mats with an empty sheet are fine (they can work another sheet via Settings).</div>'
       +'<div id="nm-mats">'+matBlocks(nMats)+'</div>'
@@ -564,8 +581,9 @@ window.MT_DB=(function(){
         for(let q=1;q<=n;q++){ const id='m'+q; const secs=parseRoster($('nm-'+id).value); parsed[id]={name:(mats[id]&&mats[id].name)||('Mat '+q),sections:secs}; total+=secs.reduce((a,s)=>a+s.bouts.length,0); }
         const id=ex?ex.id:$('nm-date').value; if(!id){ $('nm-preview').textContent='Pick a date.'; toast('Pick a date'); return; }
         if(!total&&!t.dataset.confirmed){ t.dataset.confirmed='1'; t.textContent='No bouts yet — create anyway? (add sheets later via Meets → Edit)'; return; }
+        if(window.MT_DB&&window.MT_NEEDPIN&&!window.MT_NEEDPIN()){ toast('View only: PIN needed to make changes'); return; }
         const firstWith=Object.keys(parsed).find(k=>parsed[k].sections.some(s=>s.bouts.length))||'m1';
-        const doc={id,title:$('nm-title').value.trim()||('Meet '+id),start:$('nm-start').value||'16:30',startWt:+$('nm-startwt').value||null,startAt:ex?ex.startAt||null:null,work:ex?ex.work||null:null,mats:parsed,prior:pr,track:ex?ex.track:(firstWith+'|0'),summary:ex?ex.summary||null:null,updatedAtMs:Date.now()};
+        const doc={id,title:$('nm-title').value.trim()||('Meet '+id),start:$('nm-start').value||'16:30',startWt:+$('nm-startwt').value||null,startAt:ex?ex.startAt||null:null,work:ex?ex.work||null:null,mats:parsed,prior:pr,flo:[...new Set([...((($('nm-flo')||{}).value)||'').matchAll(/events\/([A-Za-z0-9]{10,})/g)].map(x=>x[1]))],track:ex?ex.track:(firstWith+'|0'),summary:ex?ex.summary||null:null,updatedAtMs:Date.now()};
         const findTrack=name=>{ for(const m of Object.keys(doc.mats)){ const i=doc.mats[m].sections.flatMap(s=>s.bouts).findIndex(b=>b[1]===name||b[2]===name); if(i>=0) return m+'|'+i; } return null; };
         const keep=findTrack('Oliver Swenson'); if(keep) doc.track=keep;
         if(!db){ $('nm-preview').textContent='Sign in to save a meet.'; toast('Not signed in'); return; }
@@ -642,6 +660,48 @@ window.MT_DB=(function(){
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') hardRefresh(); });
   // live tick: elapsed clocks and the now-floor on the projection, once a second; full redraw every 20 s
   setInterval(()=>{ MIDS().forEach(m=>{ const M=matModel(m,0); const c=$('clk-'+m); if(c&&M.live) c.textContent=mss(nowMin()-M.live.x.start); }); project(); },1000);
+
+  // Flo auto-advance: a bout that shows a winner on FloWrestling is marked done, so "bouts ahead" stays right without tapping.
+  const FLO='https://prod-web-api.flowrestling.org/api/event-hub/';
+  const nmz=t=>String(t||'').toLowerCase().replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+  const lev=(a,b)=>{ const d=[]; for(let i=0;i<=a.length;i++) d[i]=[i]; for(let j=1;j<=b.length;j++) d[0][j]=j; for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++) d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return d[a.length][b.length]; };
+  const sameName=(a,b)=>{ a=nmz(a); b=nmz(b); if(!a||!b) return false; if(a===b) return true; const la=a.split(' ').pop(), lb=b.split(' ').pop(); return lev(a,b)<=3||(a[0]===b[0]&&lev(la,lb)<=1); };
+  let floBusy=false;
+  const floNote=t=>{ const el=$('status'); if(el){ if(t) el.dataset.flo=t; else delete el.dataset.flo; } };
+  async function floSync(){
+    const ids=window.MT_FLO_TEST||((meetsIdx[MEET.id]||{}).flo)||[];
+    if(!ids.length||floBusy||MEET.id!==todayId()) return;
+    if(window.MT_DB&&!(window.MT_HASPIN&&window.MT_HASPIN())) return;   // only unlocked phones mark bouts
+    floBusy=true;
+    try{ let seen=0, marked=0, miss=0;
+      for(const ev of ids){
+        const ws=await (await fetch(FLO+ev+'/results/rounds/event-weight-class?offset=0&limit=1000')).json();
+        for(const w of (ws.data||[])){
+          const gf=encodeURIComponent(JSON.stringify({id:'event-weight-class',type:'string',value:w.id}));
+          const r=await (await fetch(FLO+ev+'/results/rounds/event-weight-class/items?groupFilter='+gf)).json();
+          for(const g of (r.data||[])) for(const rd of (g.items||[])) for(const fb of (rd.items||[])){
+            const a=fb.athlete1||{}, c=fb.athlete2||{}; if(!(a.isWinner||c.isWinner)) continue; seen++;
+            let hit=null, already=false;
+            const open_=(m,i)=>{ const x=state[key(m,i)]||{}; return !(x.flo||x.end!=null||x.start!=null||x.forfeit===true); };
+            // pass 1: same weight, both names. pass 2: both names, any weight. pass 3: same weight, one name (opponent changed on the sheet).
+            const tests=[(b)=>String(b[0])===String(fb.weightClass)&&((sameName(b[1],a.name)&&sameName(b[2],c.name))||(sameName(b[1],c.name)&&sameName(b[2],a.name))),
+                         (b)=>(sameName(b[1],a.name)&&sameName(b[2],c.name))||(sameName(b[1],c.name)&&sameName(b[2],a.name)),
+                         (b)=>String(b[0])===String(fb.weightClass)&&(sameName(b[1],a.name)||sameName(b[2],c.name)||sameName(b[1],c.name)||sameName(b[2],a.name))];
+            for(let t=0;t<tests.length&&!hit&&!already;t++){
+              for(const m of MIDS()){ const bs=flat(m), ord=order(m);
+                for(const i of ord){ const b=bs[i]; if(!b||!b[1]||!b[2]||!tests[t](b)) continue; if(!open_(m,i)){ if(t<2) already=true; continue; } hit={m,i,b}; break; }
+                if(hit||already) break; } }
+            if(hit){ const w1=a.isWinner?a:c; commit(key(hit.m,hit.i),{forfeit:true,flo:fb.winType||'done',floAt:nowMin(),winner:sameName(hit.b[1],w1.name)?'ems':'lhms'}); marked++; }
+            else if(!already){ miss++; try{ console.log('[flo] no sheet row for',fb.weightClass,a.name,'vs',c.name); }catch(e){} }
+          }
+        }
+      }
+      floNote('Flo: '+seen+' finished'+(marked?' · '+marked+' new':'')+(miss?' · '+miss+' not on a sheet':''));
+    }catch(e){ floNote('Flo: read failed'); }
+    floBusy=false;
+  }
+  window.MT_FLOSYNC=floSync;
+  setInterval(floSync,30000); setTimeout(floSync,4000);
   setInterval(()=>{ if(!$('modal').classList.contains('open')) renderAll(); },20000);
 
   let unsub=null;
