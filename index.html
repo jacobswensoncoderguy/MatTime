@@ -250,7 +250,8 @@ window.MT_DB=(function(){
   const MIDS=()=>Object.keys(MATS);                       // sheet/mat ids m1..mN in order
   const cidx=m=>Math.max(0,MIDS().indexOf(m));
   // MEET.work: sheetId -> [matIds working it]. Default: each sheet on its own mat.
-  const workOf=sh=>{ const w=MEET.work&&MEET.work[sh]; if(w&&w.length) return w.filter(m=>MATS[m]); const idle=MIDS().filter(m=>m!==sh&&!flat(m).length); return [sh,...idle]; };
+  const hasFloIds=()=>{ try{ return !!(window.MT_FLO_TEST||((meetsIdx[MEET.id]||{}).flo||[]).length); }catch(e){ return false; } };
+  const workOf=sh=>{ const w=MEET.work&&MEET.work[sh]; if(w&&w.length) return w.filter(m=>MATS[m]); if(hasFloIds()) return [sh]; const idle=MIDS().filter(m=>m!==sh&&!flat(m).length); return [sh,...idle]; };
   const sheetsOf=m=>MIDS().filter(sh=>workOf(sh).includes(m));
   const flat=m=>MATS[m].sections.flatMap(s=>s.bouts);
   const key=(m,i)=>m+'-'+String(i+1).padStart(2,'0');
@@ -311,11 +312,20 @@ window.MT_DB=(function(){
   }
   // recent start-to-start pace (last 6 logged starts) across the mat's own sheet, counting the sheet positions between first and last logged start (unlogged bouts in between still took time), minus forfeits
   function paceOf(m){ let rows=onMat(m).filter(r=>r.x.start!=null&&r.sh===m); if(rows.length<2) return null; rows=rows.slice(-6); const a=rows[0], z=rows[rows.length-1]; const bouts=flat(m); const O=order(m); const pa=pos(m,a.i), pz=pos(m,z.i); let f=0; for(let q=Math.min(pa,pz);q<Math.max(pa,pz);q++){ const i=O[q]; if(isF(bouts[i],state[key(m,i)])) f++; } const n=Math.abs(pz-pa)-f; return n>0?(z.x.start-a.x.start)/n:null; }
+  function floPace(m){
+    const O=order(m); const rows=[]; flat(m).forEach((b,i)=>{ const x=state[key(m,i)]||{}; if(x.flo&&x.end!=null) rows.push({p:O.indexOf(i),t:x.end}); });
+    if(rows.length<3) return null; rows.sort((a,b)=>a.t-b.t);
+    const pts=[]; let fr=-1; rows.forEach(r=>{ fr=Math.max(fr,r.p); const l=pts[pts.length-1]; if(l&&Math.abs(l.t-r.t)<0.05) l.f=fr; else pts.push({t:r.t,f:fr}); });
+    const w=pts.slice(-10); if(w.length<2) return null; const a=w[0], z=w[w.length-1]; const dt=z.t-a.t, dp=z.f-a.f;
+    if(dt<2||dp<2) return null; return Math.min(15,Math.max(0.5,dt/dp));
+  }
   function matModel(m,r0){
-    const st=stats(m); let dur,gap;
+    const st=stats(m); let dur,gap; const fp=floPace(m), anyFlo=flat(m).some((b,i)=>(state[key(m,i)]||{}).flo);
     const pr=(MEET.prior&&(MEET.prior.all||MEET.prior[m]))||null;   // pooled {dur,gap} from past meets; mat numbers are not comparable across gyms
     const r=paceOf(m)||(pr?pr.dur+pr.gap:null)||r0||4.3;
-    if(st.nd>=2&&st.ng>=2){ dur=st.dur; gap=st.gap; }
+    if(fp){ dur=Math.min((pr&&pr.dur)||2.5,fp*0.6); gap=Math.max(0.2,fp-dur); }                 // Flo: measured minutes per sheet position
+    else if(anyFlo&&pr){ dur=pr.dur; gap=pr.gap; }                                              // Flo results seen but not spread over time yet: history
+    else if(st.nd>=2&&st.ng>=2){ dur=st.dur; gap=st.gap; }
     else if(st.nd>=2){ dur=st.dur; gap=Math.max(0.5,r-st.dur); }   // durations known, few gaps: setup = pace minus mat time
     else if(pr&&!paceOf(m)){ dur=pr.dur; gap=pr.gap; }            // nothing logged yet: use history
     else { dur=r*0.6; gap=r*0.4; }
@@ -325,7 +335,7 @@ window.MT_DB=(function(){
     const lastStart=rows.reduce((a,r)=>r.x.start!=null?Math.max(a??-1,r.x.start):a,null);
     if(live) free=Math.max(live.x.start+dur, nowMin()); else if(lastEnd!=null) free=lastEnd; else if(lastStart!=null) free=lastStart+dur;
     const waiting=flat(m).map((b,i)=>({i,b,x:state[key(m,i)]||{}})).filter(o=>!isF(o.b,o.x)&&o.x.start==null).map(o=>o.i);
-    return {dur,gap,free,waiting,live,measured:st.nd>=2&&st.ng>=2,nd:st.nd};
+    return {dur,gap,free,waiting,live,measured:fp?true:(anyFlo?false:(st.nd>=2&&st.ng>=2)),nd:st.nd};
   }
   // next bout on a mat: an explicitly queued one, else the first waiting bout after the furthest logged bout, else the first waiting bout
   function nextUp(m){
@@ -429,7 +439,7 @@ window.MT_DB=(function(){
       {
         const k=key(m,i), x=state[k]||{}; const ff=isF(b,x);
         const r=document.createElement('div'); r.className='r'+(ff?' ff':'')+(x.end!=null?' done':'')+(i===live?' live':'')+(i===nu?' next':'')+(k===tk?' ours':''); r.dataset.k=k; r.style.setProperty('--mc','var(--'+m+')');
-        let chip=x.flo?('FLO '+esc(x.flo)):ff?'FF':x.end!=null?mss(x.end-x.start)+(x.start!=null?' · '+fmt(x.start):''):x.start!=null?'LIVE '+fmt(x.start):i===nu?'NEXT':(x.onMat&&x.onMat!==m?'→ '+esc(MATS[x.onMat].name):'');
+        let chip=(x.flo&&ff)?('FLO '+esc(x.flo)):ff?'FF':x.end!=null?mss(x.end-x.start)+(x.start!=null?' · '+fmt(x.start):''):x.start!=null?'LIVE '+fmt(x.start):i===nu?'NEXT':(x.onMat&&x.onMat!==m?'→ '+esc(MATS[x.onMat].name):'');
         r.innerHTML='<span class="n">'+(i+1)+'</span><span class="w">'+esc(b[0])+'</span><span class="nm '+(x.winner==='ems'?'win':x.winner==='lhms'?'lose':'')+'">'+(b[1]?esc(b[1]):'<i>forfeit</i>')+'</span><span class="nm '+(x.winner==='lhms'?'win':x.winner==='ems'?'lose':'')+'">'+(b[2]?esc(b[2]):'<i>forfeit</i>')+'</span><span class="chip">'+chip+'</span>';
         r.addEventListener('click',()=>openEdit(k)); el.appendChild(r);
       }
@@ -656,7 +666,11 @@ window.MT_DB=(function(){
       catch(e){ $('status').textContent='Refresh failed: '+(e.code||e.message); } }
     renderAll(); $('hdr').classList.add('flash'); setTimeout(()=>$('hdr').classList.remove('flash'),500); btn.disabled=false; btn.textContent='Refresh';
   }
-  $('refresh').addEventListener('click',hardRefresh);
+  const freshUrl=()=>location.pathname+'?v='+Date.now();
+  let srcSig=null;
+  async function checkBuild(reloadNow){ try{ const t=await (await fetch(freshUrl(),{cache:'no-store'})).text(); const sig=t.length+':'+t.slice(-400); if(srcSig===null){ srcSig=sig; if(reloadNow) location.replace(freshUrl()); return; } if(sig!==srcSig||reloadNow) location.replace(freshUrl()); }catch(e){ if(reloadNow) location.reload(); } }
+  checkBuild(false); setInterval(()=>{ if(!$('modal').classList.contains('open')) checkBuild(false); },180000);
+  $('refresh').addEventListener('click',()=>checkBuild(true));
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') hardRefresh(); });
   // live tick: elapsed clocks and the now-floor on the projection, once a second; full redraw every 20 s
   setInterval(()=>{ MIDS().forEach(m=>{ const M=matModel(m,0); const c=$('clk-'+m); if(c&&M.live) c.textContent=mss(nowMin()-M.live.x.start); }); project(); },1000);
@@ -680,18 +694,25 @@ window.MT_DB=(function(){
           const gf=encodeURIComponent(JSON.stringify({id:'event-weight-class',type:'string',value:w.id}));
           const r=await (await fetch(FLO+ev+'/results/rounds/event-weight-class/items?groupFilter='+gf)).json();
           for(const g of (r.data||[])) for(const rd of (g.items||[])) for(const fb of (rd.items||[])){
-            const a=fb.athlete1||{}, c=fb.athlete2||{}; if(!(a.isWinner||c.isWinner)) continue; seen++;
+            const a=fb.athlete1||{}, c=fb.athlete2||{};
+            const fin=!!(a.isWinner||c.isWinner); const liveNow=!fin&&((+a.score||0)+(+c.score||0)>0);
+            if(!fin&&!liveNow) continue; if(fin) seen++;
             let hit=null, already=false;
-            const open_=(m,i)=>{ const x=state[key(m,i)]||{}; return !(x.flo||x.end!=null||x.start!=null||x.forfeit===true); };
-            // pass 1: same weight, both names. pass 2: both names, any weight. pass 3: same weight, one name (opponent changed on the sheet).
-            const tests=[(b)=>String(b[0])===String(fb.weightClass)&&((sameName(b[1],a.name)&&sameName(b[2],c.name))||(sameName(b[1],c.name)&&sameName(b[2],a.name))),
-                         (b)=>(sameName(b[1],a.name)&&sameName(b[2],c.name))||(sameName(b[1],c.name)&&sameName(b[2],a.name)),
-                         (b)=>String(b[0])===String(fb.weightClass)&&(sameName(b[1],a.name)||sameName(b[2],c.name)||sameName(b[1],c.name)||sameName(b[2],a.name))];
+            const open_=(m,i)=>{ const x=state[key(m,i)]||{}; return !(x.end!=null||x.forfeit===true||(x.flo&&!fin)||(!fin&&x.start!=null)); };
+            const both=b=>(sameName(b[1],a.name)&&sameName(b[2],c.name))||(sameName(b[1],c.name)&&sameName(b[2],a.name));
+            const tests=[b=>String(b[0])===String(fb.weightClass)&&both(b), b=>both(b),
+                         b=>String(b[0])===String(fb.weightClass)&&(sameName(b[1],a.name)||sameName(b[2],c.name)||sameName(b[1],c.name)||sameName(b[2],a.name))];
             for(let t=0;t<tests.length&&!hit&&!already;t++){
               for(const m of MIDS()){ const bs=flat(m), ord=order(m);
                 for(const i of ord){ const b=bs[i]; if(!b||!b[1]||!b[2]||!tests[t](b)) continue; if(!open_(m,i)){ if(t<2) already=true; continue; } hit={m,i,b}; break; }
                 if(hit||already) break; } }
-            if(hit){ const w1=a.isWinner?a:c; commit(key(hit.m,hit.i),{forfeit:true,flo:fb.winType||'done',floAt:nowMin(),winner:sameName(hit.b[1],w1.name)?'ems':'lhms'}); marked++; }
+            if(hit){ const k=key(hit.m,hit.i), x=state[k]||{}, now=nowMin(), wt=String(fb.winType||'').toUpperCase();
+              if(!fin){ commit(k,{start:now,flo:'live'}); }
+              else if(/^(FF|FOR|M ?FOR|DQ|NC|BYE)/.test(wt)){ commit(k,{forfeit:true,flo:wt||'FF',floAt:now,winner:sameName(hit.b[1],(a.isWinner?a:c).name)?'ems':'lhms'}); marked++; }
+              else { let lastEnd=null; flat(hit.m).forEach((b,j)=>{ const y=state[key(hit.m,j)]||{}; if(y.end!=null&&y.end<=now) lastEnd=Math.max(lastEnd??-1,y.end); });
+                const pr=(MEET.prior&&MEET.prior.all)||{dur:2.5}; const est=/^F/.test(wt)?Math.min(pr.dur||2.5,3):/^(SV|OT|TB|UTB)/.test(wt)?5.5:4.5;
+                const st0=x.start!=null&&x.start<=now?x.start:Math.min(now,Math.max(lastEnd??-1,now-est));
+                commit(k,{start:st0,end:now,flo:wt||'done',floAt:now,winner:sameName(hit.b[1],(a.isWinner?a:c).name)?'ems':'lhms'}); marked++; } }
             else if(!already){ miss++; try{ console.log('[flo] no sheet row for',fb.weightClass,a.name,'vs',c.name); }catch(e){} }
           }
         }
@@ -701,7 +722,7 @@ window.MT_DB=(function(){
     floBusy=false;
   }
   window.MT_FLOSYNC=floSync;
-  setInterval(floSync,30000); setTimeout(floSync,4000);
+  setInterval(floSync,20000); setTimeout(floSync,4000);
   setInterval(()=>{ if(!$('modal').classList.contains('open')) renderAll(); },20000);
 
   let unsub=null;
