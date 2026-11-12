@@ -767,6 +767,7 @@ window.MT_DB=(function(){
     await loadMeetsIdx();
     try{ const cfg=await db.collection('config').doc('current').get(); const c=cfg&&cfg.exists!==false?(cfg.data?cfg.data():cfg):null;
       let cur=c&&c.id?c.id:null;
+      { const t=todayId(); if(meetsIdx[t]) cur=t; else if(!cur||cur<t||!meetsIdx[cur]){ const up=Object.keys(meetsIdx).filter(i=>i>t).sort()[0]; if(up) cur=up; } }   // open today's meet by itself; otherwise the next one coming up
       if(c&&c.mats&&!meetsIdx[c.id]){ meetsIdx[c.id]=c; }   // older full-config doc
       if(cur&&meetsIdx[cur]&&meetsIdx[cur].mats&&(cur!==MEET.id||JSON.stringify(meetsIdx[cur].mats)!==JSON.stringify(MATS))){ const x=meetsIdx[cur]; MEET={id:x.id||cur,title:x.title,start:x.start,track:x.track,prior:x.prior||null,startWt:x.startWt||null,startAt:x.startAt||null,work:x.work||null}; MATS=x.mats; try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){} state={}; glog={}; buildRoster(); loadLocal(); renderAll(); }
       else if(cur===MEET.id&&meetsIdx[cur]&&meetsIdx[cur].prior&&!MEET.prior){ MEET.prior=meetsIdx[cur].prior; }
