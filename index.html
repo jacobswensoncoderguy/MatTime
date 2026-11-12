@@ -442,7 +442,7 @@ window.MT_DB=(function(){
       {
         const k=key(m,i), x=state[k]||{}; const ff=isF(b,x);
         const r=document.createElement('div'); r.className='r'+(ff?' ff':'')+(x.end!=null?' done':'')+(i===live?' live':'')+(i===nu?' next':'')+(k===tk?' ours':''); r.dataset.k=k; r.style.setProperty('--mc','var(--'+m+')');
-        let chip=(x.flo&&ff)?('FLO '+esc(x.flo)):ff?'FF':x.end!=null?mss(x.end-x.start)+(x.start!=null?' · '+fmt(x.start):''):x.start!=null?'LIVE '+fmt(x.start):i===nu?'NEXT':(x.onMat&&x.onMat!==m?'→ '+esc(MATS[x.onMat].name):'');
+        let chip=(x.flo&&ff)?('FLO '+esc(x.flo)):ff?'FF':x.end!=null?(x.auto?('done '+fmt(x.end)+(x.flo&&x.flo!=='done'?' · '+esc(x.flo):'')):(mss(x.end-x.start)+' long'+(x.start!=null?' · began '+fmt(x.start):''))):x.start!=null?'LIVE '+fmt(x.start):i===nu?'NEXT':(x.onMat&&x.onMat!==m?'→ '+esc(MATS[x.onMat].name):'');
         r.innerHTML='<span class="n">'+(i+1)+'</span><span class="w">'+esc(b[0])+'</span><span class="nm '+(x.winner==='ems'?'win':x.winner==='lhms'?'lose':'')+'">'+(b[1]?esc(b[1]):'<i>forfeit</i>')+'</span><span class="nm '+(x.winner==='lhms'?'win':x.winner==='ems'?'lose':'')+'">'+(b[2]?esc(b[2]):'<i>forfeit</i>')+'</span><span class="chip">'+chip+'</span>';
         r.addEventListener('click',()=>openEdit(k)); el.appendChild(r);
       }
