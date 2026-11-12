@@ -134,7 +134,7 @@ details.adv label{display:grid;gap:4px;font-size:12px;font-weight:700;color:var(
 
 <main>
   <header class="hdr" id="hdr">
-    <div class="row"><h1>Mat Clock</h1><button type="button" class="meet" id="meetTitle" title="Meets: history, new meet, roster"></button><button type="button" class="meet" id="meetStart" style="flex:0 0 auto" title="Scheduled start"></button></div>
+    <div class="row"><h1>Mat Time</h1><button type="button" class="meet" id="meetTitle" title="Meets: history, new meet, roster"></button><button type="button" class="meet" id="meetStart" style="flex:0 0 auto" title="Scheduled start"></button><button type="button" class="meet" id="meetWt" style="flex:0 0 auto" title="Starting weight class"></button></div>
     <div class="row">
       <div class="pick"><input type="search" id="find" list="names" placeholder="Type a wrestler or weight" autocomplete="off"><datalist id="names"></datalist><button type="button" id="clearFind" title="Clear" style="background:var(--bg);color:var(--fg);border:0;padding:0 12px">×</button><button type="button" id="go">Track</button></div>
       <select id="track" hidden></select>
@@ -526,6 +526,7 @@ window.MT_DB=(function(){
     if(isFinite(first)&&sch!=null) out.slip=+(first-sch).toFixed(1);
     return out;
   }
+  const dateLbl=id=>{ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(id||''); if(!m) return ''; const d=new Date(+m[1],+m[2]-1,+m[3]); return d.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'}); };
   const todayId=()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
   function recordSummary(){ if(!db||Date.now()-lastSummary<60000||MEET.id!==todayId()) return; const sm=meetSummary(); if(!MIDS().some(m=>sm[m])) return; lastSummary=Date.now(); meetsIdx[MEET.id]={...(meetsIdx[MEET.id]||{}),summary:sm}; try{ db.collection('meets').doc(MEET.id).update({summary:sm}).catch(()=>{}); }catch(e){} }
   function priorsFromHistory(){
@@ -561,7 +562,7 @@ window.MT_DB=(function(){
     const ids=Object.keys(meetsIdx).sort().reverse();
     let h='<h3>Meets</h3><div class="list">';
     ids.forEach(id=>{ const x=meetsIdx[id]; const sm=x.summary||{}; const cur=id===MEET.id;
-      h+='<div class="meetrow"><div><b>'+esc(x.title||id)+'</b>'+(cur?' · viewing':'')+'<small>'+(sm.m1?'Mat 1 '+mss(sm.m1.dur)+'+'+mss(sm.m1.gap)+' · ':'')+(sm.m2?'Mat 2 '+mss(sm.m2.dur)+'+'+mss(sm.m2.gap)+' · ':'')+(sm.bouts?sm.bouts+' bouts timed':'no timing yet')+(sm.slip!=null?' · first whistle '+(sm.slip>=0?'+':'')+sm.slip+' min':'')+'</small></div>'
+      h+='<div class="meetrow"><div><b>'+esc(dateLbl(id)||id)+' · '+esc(x.title||id)+'</b>'+(id===todayId()?' · TODAY':'')+(cur?' · viewing':'')+'<small>'+(sm.m1?'Mat 1 '+mss(sm.m1.dur)+'+'+mss(sm.m1.gap)+' · ':'')+(sm.m2?'Mat 2 '+mss(sm.m2.dur)+'+'+mss(sm.m2.gap)+' · ':'')+(sm.bouts?sm.bouts+' bouts timed':'no timing yet')+(sm.slip!=null?' · first whistle '+(sm.slip>=0?'+':'')+sm.slip+' min':'')+'</small></div>'
         +'<button type="button" data-open="'+id+'">Open</button><button type="button" data-cur="'+id+'"'+(cur?' disabled':'')+'>Set current</button></div>'; });
     if(!ids.length) h+='<div class="meetrow">No meets stored yet.</div>';
     const pr=priorsFromHistory();
@@ -624,6 +625,7 @@ window.MT_DB=(function(){
     wire(); prev();
   }
   $('meetTitle').addEventListener('click',openMeets);
+  $('meetWt').addEventListener('click',()=>{ const v=window.prompt('Starting weight class for this meet (leave blank for lightest)',MEET.startWt||''); if(v===null) return; const n=parseInt(v,10); MEET.startWt=(n>0?n:null); saveMeetDoc(); try{ buildRoster(); }catch(e){} try{ applyFlo(); }catch(e){} renderAll(); });
   $('meetStart').addEventListener('click',()=>{
     const h='<h3>Scheduled start</h3><div class="warn">This time was set when the meet was created. Changing it moves every guess for every parent, and the first-whistle history for this meet is measured against it. Change only if the schedule itself changed.</div>'
       +'<label>New scheduled start <input type="time" id="ms-time" value="'+esc(MEET.start||'16:30')+'"></label><div class="acts"><button type="button" data-close="1">Cancel</button><button type="button" class="save" data-set="1">Change start time</button></div>';
@@ -648,7 +650,7 @@ window.MT_DB=(function(){
     $('track').value=MEET.track||$('track').options[0]?.value||'';
     { const me=NAMES.find(x=>x.n.replace(/\*/g,'').trim().toLowerCase()==='oliver swenson'); if(me) $('track').value=me.v; }
     { const tv0=$('track').value; const [m,i]=tv0?tv0.split('|'):[null,0]; const b=(m&&MATS[m])?flat(m)[+i]:null; const mine=b&&[b[1],b[2]].find(n=>n&&/oliver swenson/i.test(n)); $('find').value=b?(mine||b[1]||b[2]):''; }
-    $('startTime').value=MEET.start||'16:30'; $('meetTitle').textContent=MEET.title||MEET.id; $('meetStart').textContent='Starts '+fmt(toMin(MEET.start||'16:30'));
+    $('startTime').value=MEET.start||'16:30'; $('meetTitle').textContent=(MEET.title||MEET.id)+(dateLbl(MEET.id)?' · '+dateLbl(MEET.id):''); $('meetStart').textContent='Starts '+fmt(toMin(MEET.start||'16:30')); $('meetWt').textContent='Start wt '+(MEET.startWt||'—');
   }
   function selectTrack(v,label){ $('track').value=v; $('find').value=label||''; try{ localStorage.setItem(LS('track'),v); }catch(e){} renderAll(); toast('Tracking '+label); }
   function findName(q,exactOnly){ q=(q||'').trim().toLowerCase(); if(q.length<2) return false;
@@ -674,6 +676,10 @@ window.MT_DB=(function(){
   async function checkBuild(reloadNow){ try{ const t=await (await fetch(freshUrl(),{cache:'no-store'})).text(); const sig=t.length+':'+t.slice(-400); if(srcSig===null){ srcSig=sig; if(reloadNow) location.replace(freshUrl()); return; } if(sig!==srcSig||reloadNow) location.replace(freshUrl()); }catch(e){ if(reloadNow) location.reload(); } }
   checkBuild(false); setInterval(()=>{ if(!$('modal').classList.contains('open')) checkBuild(false); },180000);
   $('refresh').addEventListener('click',()=>checkBuild(true));
+  (function(){ let y0=null, armed=false; const top=()=>((document.scrollingElement||document.documentElement).scrollTop||0)<=0;
+    document.addEventListener('touchstart',e=>{ y0=(top()&&!$('modal').classList.contains('open')&&e.touches.length===1)?e.touches[0].clientY:null; armed=false; },{passive:true});
+    document.addEventListener('touchmove',e=>{ if(y0===null) return; const dy=e.touches[0].clientY-y0; if(dy>110&&top()){ if(!armed){ armed=true; toast('Release to refresh'); } } else armed=false; },{passive:true});
+    document.addEventListener('touchend',()=>{ if(armed){ toast('Refreshing…'); checkBuild(true); } y0=null; armed=false; },{passive:true}); })();
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') hardRefresh(); });
   // live tick: elapsed clocks and the now-floor on the projection, once a second; full redraw every 20 s
   setInterval(()=>{ MIDS().forEach(m=>{ const M=matModel(m,0); const c=$('clk-'+m); if(c&&M.live) c.textContent=mss(nowMin()-M.live.x.start); }); project(); },1000);
