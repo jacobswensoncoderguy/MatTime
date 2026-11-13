@@ -321,7 +321,7 @@ window.MT_DB=(function(){
     const pts=[]; let fr=-1; rows.forEach(r=>{ fr=Math.max(fr,r.p); const l=pts[pts.length-1]; if(l&&Math.abs(l.t-r.t)<0.05) l.f=fr; else pts.push({t:r.t,f:fr}); });
     const w=pts.slice(-10); if(w.length<2) return null; const a=w[0], z=w[w.length-1]; const dt=z.t-a.t, dp=z.f-a.f;
     if(dt<8||dp<4) return null;   // too few results to measure: stay on history
-    const pr0=(MEET.prior&&MEET.prior.all)?(MEET.prior.all.dur+MEET.prior.all.gap):5.7; const raw=Math.min(12,Math.max(1.5,dt/dp));
+    const pr0=(MEET.prior&&MEET.prior.all)?(MEET.prior.all.dur+MEET.prior.all.gap):5.7; const raw=Math.min(6.5,Math.max(2.5,dt/dp));
     return (raw*dp+pr0*4)/(dp+4);   // lean on history until many bouts have been measured
   }
   function matModel(m,r0){
@@ -375,10 +375,10 @@ window.MT_DB=(function(){
     if(nu===N) ahead=0;
     let anchor=M.free!=null?M.free:start0; const live=M.free!=null; anchor=Math.max(anchor,now);
     // lanes: every mat assigned to this sheet. A mat still working its own sheet joins once that sheet is done.
-    const lanes=workOf(tm).map(m=>{ const Mm=m===tm?M:matModel(m,r0); let t=Math.max(Mm.free!=null?Mm.free:start0,now); const pm=Mm.dur+Mm.gap;
+    const lanes=workOf(tm).map(m=>{ const Mm=m===tm?M:matModel(m,r0); const floLane=hasFloIds()&&Mm.free!=null&&!Mm.live; let t=floLane?Mm.free:Math.max(Mm.free!=null?Mm.free:start0,now); const pm=Mm.dur+Mm.gap;
       if(m!==tm){ const own=sheetsOf(m).filter(sh=>sh!==tm); own.forEach(sh=>{ t+=remainingOn(sh)*pm; }); } return {m,t,pace:pm,gap:Mm.gap}; });
     let left=ahead; while(left>0){ lanes.sort((a,b)=>a.t-b.t); lanes[0].t+=lanes[0].pace; left--; }
-    lanes.sort((a,b)=>a.t-b.t); const lane=lanes[0]; const eta=lane.t+lane.gap; const half=live?Math.max(3,1.0*ahead+2):Math.min(40,Math.max(15,0.12*ahead*pace));
+    lanes.sort((a,b)=>a.t-b.t); const lane=lanes[0]; const eta=Math.max(lane.t+lane.gap,now+(ahead>0?1:0)); const half=live?Math.max(3,1.0*ahead+2):Math.min(40,Math.max(15,0.12*ahead*pace));
     const matNames=lanes.filter(l=>l.t<=eta+half).map(l=>MATS[l.m].name); const matLabel=matNames.length>1?matNames.join(' or '):MATS[lane.m].name;
     $('upText').textContent=ahead===0?'NEXT':String(ahead); $('upSub').textContent=(ahead===1?'bout ahead':'bouts ahead')+' · '+matLabel;
     $('winText').textContent=fmt(eta-half)+' – '+fmt(eta+half); $('etaText').textContent=fmt(eta);
@@ -730,8 +730,8 @@ window.MT_DB=(function(){
       const st0=(o.liveMs&&o.liveMs<o.endMs)?msToMin(o.liveMs):Math.min(end,Math.max(lastEnd??-1,end-est));
       state[k]={start:st0,end:end,flo:wt||'done',winner:win,auto:true};
     }
-    const n=Object.keys(floObs).length;
-    floNote(n?('Flo: '+n+' bouts listed · '+fin+' finished'+(miss?' · '+miss+' not on a sheet':'')):(floIds().length?'Flo: nothing posted yet':''));
+    const n=Object.keys(floObs).length; const lastMs=obs.reduce((m,o)=>Math.max(m,o.endMs||o.liveMs||0),0); const quiet=(lastMs&&MEET.id===todayId())?Math.floor((Date.now()-lastMs)/60000):0;
+    floNote(n?('Flo: '+n+' bouts listed · '+fin+' finished'+(miss?' · '+miss+' not on a sheet':'')+(quiet>=8?' · no new result for '+quiet+' min, estimate assumes the mats kept moving':'')):(floIds().length?'Flo: nothing posted yet':''));
   }
   function onFlo(){ floRoster(); applyFlo(); if(!$('modal').classList.contains('open')) renderAll(); else project(); }
   function floSubscribe(){ try{ if(floUnsub) floUnsub(); }catch(e){} floUnsub=null; floObs={}; if(!db||!floIds().length) return;
