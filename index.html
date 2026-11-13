@@ -390,9 +390,11 @@ window.MT_DB=(function(){
     let left=ahead; while(left>0){ lanes.sort((a,b)=>a.t-b.t); lanes[0].t+=lanes[0].pace; left--; }
     lanes.sort((a,b)=>a.t-b.t); const lane=lanes[0]; const eta=Math.max(lane.t+lane.gap,now+(ahead>0?1:0)); const half=live?Math.max(3,1.0*ahead+2):Math.min(40,Math.max(15,0.12*ahead*pace));
     const matNames=lanes.filter(l=>l.t<=eta+half).map(l=>MATS[l.m].name); const matLabel=matNames.length>1?matNames.join(' or '):MATS[lane.m].name;
-    $('upText').textContent=ahead===0?'NEXT':String(ahead); $('upSub').textContent=(ahead===1?'bout ahead':'bouts ahead')+' · '+matLabel;
+    // a bout on the mat still counts until it ends, so the number drops the moment a bout is finished
+    const onNow=bouts.some((b,i)=>{ const x=state[key(tm,i)]||{}; return x.start!=null&&x.end==null&&P(i)<PN; }); const shown=ahead+(onNow?1:0);
+    $('upText').textContent=shown===0?'NEXT':String(shown); $('upSub').textContent=(shown===1?'bout ahead':'bouts ahead')+' · '+matLabel+(onNow?' · 1 on the mat now':'');
     $('winText').textContent=fmt(eta-half)+' – '+fmt(eta+half); $('etaText').textContent=fmt(eta);
-    $('noteText').textContent=(live?('Mat '+mss(M.dur)+' + setup '+mss(M.gap)+' = '+pace.toFixed(1)+' min/bout'+(M.measured?' ('+M.nd+' timed)':' (early estimate)')+'; mat free ~'+fmt(anchor)):('No bouts logged on this mat; assuming first whistle '+fmt(start0)+' at '+pace.toFixed(1)+' min/bout'))+'; '+ahead+' bout'+(ahead===1?'':'s')+' still ahead of him.';
+    $('noteText').textContent=(live?('Mat '+mss(M.dur)+' + setup '+mss(M.gap)+' = '+pace.toFixed(1)+' min/bout'+(M.measured?' ('+M.nd+' timed)':' (early estimate)')+'; mat free ~'+fmt(anchor)):('No bouts logged on this mat; assuming first whistle '+fmt(start0)+' at '+pace.toFixed(1)+' min/bout'))+'; '+shown+' bout'+(shown===1?'':'s')+' still ahead of him'+(onNow?' (including the one on the mat)':'')+'.';
     logGuess(gk,eta,half,{ahead,pace:Math.round(pace*100)/100,mat:tm}); renderScore(gk);
   }
 
