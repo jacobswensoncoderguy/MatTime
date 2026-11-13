@@ -320,7 +320,9 @@ window.MT_DB=(function(){
     if(rows.length<3) return null; rows.sort((a,b)=>a.t-b.t);
     const pts=[]; let fr=-1; rows.forEach(r=>{ fr=Math.max(fr,r.p); const l=pts[pts.length-1]; if(l&&Math.abs(l.t-r.t)<0.05) l.f=fr; else pts.push({t:r.t,f:fr}); });
     const w=pts.slice(-10); if(w.length<2) return null; const a=w[0], z=w[w.length-1]; const dt=z.t-a.t, dp=z.f-a.f;
-    if(dt<2||dp<2) return null; return Math.min(15,Math.max(0.5,dt/dp));
+    if(dt<8||dp<4) return null;   // too few results to measure: stay on history
+    const pr0=(MEET.prior&&MEET.prior.all)?(MEET.prior.all.dur+MEET.prior.all.gap):5.7; const raw=Math.min(12,Math.max(1.5,dt/dp));
+    return (raw*dp+pr0*4)/(dp+4);   // lean on history until many bouts have been measured
   }
   function matModel(m,r0){
     const st=stats(m); let dur,gap; const fp=floPace(m), anyFlo=flat(m).some((b,i)=>(state[key(m,i)]||{}).flo);
