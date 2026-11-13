@@ -315,6 +315,14 @@ window.MT_DB=(function(){
   }
   // recent start-to-start pace (last 6 logged starts) across the mat's own sheet, counting the sheet positions between first and last logged start (unlogged bouts in between still took time), minus forfeits
   function paceOf(m){ let rows=onMat(m).filter(r=>r.x.start!=null&&r.sh===m); if(rows.length<2) return null; rows=rows.slice(-6); const a=rows[0], z=rows[rows.length-1]; const bouts=flat(m); const O=order(m); const pa=pos(m,a.i), pz=pos(m,z.i); let f=0; for(let q=Math.min(pa,pz);q<Math.max(pa,pz);q++){ const i=O[q]; if(isF(bouts[i],state[key(m,i)])) f++; } const n=Math.abs(pz-pa)-f; return n>0?(z.x.start-a.x.start)/n:null; }
+  // pace from bouts a person timed on this mat (exact to the second); preferred over Flo's delayed stamps once there are a few
+  function statsHand(m){
+    const rows=onMat(m).filter(r=>!r.x.auto).slice(-9); let d=[],g=[];
+    rows.forEach((r,k)=>{ const x=r.x; if(x.start!=null&&x.end!=null&&x.end-x.start>=0.5) d.push(x.end-x.start);
+      const p=rows[k-1]; if(x.start!=null&&p&&p.x.end!=null&&x.start>=p.x.end&&x.start-p.x.end<15) g.push(x.start-p.x.end); });
+    const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+    return {dur:d.length?mean(d):0,gap:g.length?mean(g):0,nd:d.length,ng:g.length};
+  }
   function floPace(m){
     const O=order(m); const rows=[]; flat(m).forEach((b,i)=>{ const x=state[key(m,i)]||{}; if(x.flo&&x.end!=null) rows.push({p:O.indexOf(i),t:x.end}); });
     if(rows.length<3) return null; rows.sort((a,b)=>a.t-b.t);
@@ -328,7 +336,9 @@ window.MT_DB=(function(){
     const st=stats(m); let dur,gap; const fp=floPace(m), anyFlo=flat(m).some((b,i)=>(state[key(m,i)]||{}).flo);
     const pr=(MEET.prior&&(MEET.prior.all||MEET.prior[m]))||null;   // pooled {dur,gap} from past meets; mat numbers are not comparable across gyms
     const r=paceOf(m)||(pr?pr.dur+pr.gap:null)||r0||4.3;
-    if(fp){ dur=Math.min((pr&&pr.dur)||2.5,fp*0.6); gap=Math.max(0.2,fp-dur); }                 // Flo: measured minutes per sheet position
+    const hs=statsHand(m);
+    if(hs.nd>=3&&hs.ng>=2){ dur=hs.dur; gap=hs.gap; }                                           // hand-timed bouts on this mat: exact, use them first
+    else if(fp){ dur=Math.min((pr&&pr.dur)||2.5,fp*0.6); gap=Math.max(0.2,fp-dur); }                 // Flo: measured minutes per sheet position
     else if(anyFlo&&pr){ dur=pr.dur; gap=pr.gap; }                                              // Flo results seen but not spread over time yet: history
     else if(st.nd>=2&&st.ng>=2){ dur=st.dur; gap=st.gap; }
     else if(st.nd>=2){ dur=st.dur; gap=Math.max(0.5,r-st.dur); }   // durations known, few gaps: setup = pace minus mat time
@@ -340,7 +350,7 @@ window.MT_DB=(function(){
     const lastStart=rows.reduce((a,r)=>r.x.start!=null?Math.max(a??-1,r.x.start):a,null);
     if(live) free=Math.max(live.x.start+dur, nowMin()); else if(lastEnd!=null) free=lastEnd; else if(lastStart!=null) free=lastStart+dur;
     const waiting=flat(m).map((b,i)=>({i,b,x:state[key(m,i)]||{}})).filter(o=>!isF(o.b,o.x)&&o.x.start==null).map(o=>o.i);
-    return {dur,gap,free,waiting,live,measured:fp?true:(anyFlo?false:(st.nd>=2&&st.ng>=2)),nd:st.nd};
+    return {dur,gap,free,waiting,live,measured:(hs.nd>=3&&hs.ng>=2)?true:(fp?true:(anyFlo?false:(st.nd>=2&&st.ng>=2))),nd:(hs.nd>=3&&hs.ng>=2)?hs.nd:st.nd};
   }
   // next bout on a mat: an explicitly queued one, else the first waiting bout after the furthest logged bout, else the first waiting bout
   function nextUp(m){
