@@ -380,7 +380,7 @@ window.MT_DB=(function(){
     const O=order(tm); const P=i=>O.indexOf(i); const PN=P(N);
     const lastLoggedInSec={}; const loggedP=[]; bouts.forEach((b,i)=>{ const x=state[key(tm,i)]||{}; if(x.start!=null||x.end!=null){ lastLoggedInSec[secOf[i]]=Math.max(lastLoggedInSec[secOf[i]]??-1,P(i)); loggedP.push(P(i)); } });
     const mode=$('skipped').value;
-    const pendingIdx=i=>{ const p=P(i); if(mode==='todo') return true; if(mode==='done') return p>(lastLoggedInSec[secOf[i]]??-1); return !loggedP.some(j=>j>p&&j<PN); };
+    const pendingIdx=i=>{ const p=P(i); if(mode==='todo') return true; if(mode==='done') return p>(lastLoggedInSec[secOf[i]]??-1); return !loggedP.some(j=>j>p+2&&j<PN); };   // an unlogged bout counts as passed only once the mat is 3+ rows beyond it (mats run a row or two out of order)
     const nu=nextUp(tm);
     let ahead=M.waiting.filter(i=>P(i)<PN&&pendingIdx(i)).length + ((nu>=0&&P(nu)>PN)?1:0);
     if(nu===N) ahead=0;
