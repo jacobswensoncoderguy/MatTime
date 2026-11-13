@@ -355,15 +355,16 @@ window.MT_DB=(function(){
   }
   // next bout on a mat: an explicitly queued one, else the first waiting bout after the furthest logged bout, else the first waiting bout
   function nextUp(m){
-    const bouts=flat(m); const q=bouts.findIndex((b,i)=>{ const x=state[key(m,i)]||{}; return x.queued===true&&x.start==null&&!isF(b,x); }); if(q>=0) return q;
+    const bouts=flat(m); const q=bouts.findIndex((b,i)=>{ const x=state[key(m,i)]||{}; return x.queued===true&&x.start==null&&!isF(b,x)&&!(x.onMat&&x.onMat!==m); }); if(q>=0) return q;
+    const away=x=>x.queued===true&&x.onMat&&x.onMat!==m;
     const O=order(m); let lastP=-1; O.forEach((i,p)=>{ const x=state[key(m,i)]||{}; if(x.start!=null||x.end!=null) lastP=p; }); const last=lastP>=0?O[lastP]:-1;
-    for(let p=lastP+1;p<O.length;p++){ const i=O[p]; const x=state[key(m,i)]||{}; if(!isF(bouts[i],x)&&x.start==null) return i; }
+    for(let p=lastP+1;p<O.length;p++){ const i=O[p]; const x=state[key(m,i)]||{}; if(!isF(bouts[i],x)&&x.start==null&&!away(x)) return i; }
     // end of sheet reached after the last logged bout: circle back within that bout's section first (the mat is working that list out of order), then anywhere
     const secOf=[]; MATS[m].sections.forEach((sec,si)=>sec.bouts.forEach(()=>secOf.push(si)));
     const secStart=last>=0?secOf.indexOf(secOf[last]):0;
     const ps=O.findIndex(i=>i===secStart);
-    for(let p=Math.max(0,ps);p<O.length;p++){ const i=O[p]; const x=state[key(m,i)]||{}; if(!isF(bouts[i],x)&&x.start==null) return i; }
-    for(let p=0;p<O.length;p++){ const i=O[p]; const x=state[key(m,i)]||{}; if(!isF(bouts[i],x)&&x.start==null) return i; }
+    for(let p=Math.max(0,ps);p<O.length;p++){ const i=O[p]; const x=state[key(m,i)]||{}; if(!isF(bouts[i],x)&&x.start==null&&!away(x)) return i; }
+    for(let p=0;p<O.length;p++){ const i=O[p]; const x=state[key(m,i)]||{}; if(!isF(bouts[i],x)&&x.start==null&&!away(x)) return i; }
     return -1;
   }
   // bouts a sheet still has to run: waiting bouts after its furthest logged position in running order (all of them if nothing logged yet)
@@ -418,7 +419,8 @@ window.MT_DB=(function(){
 
   // ---------- render ----------
   function trackedKey(){ const v=$('track').value; if(!v) return null; const [m,i]=v.split('|'); return key(m,+i); }
-  function nextForMat(m){ for(const sh of [m,...sheetsOf(m).filter(x=>x!==m)]){ if(!MATS[sh]) continue; const i=nextUp(sh); if(i>=0) return {sh,i}; } return null; }
+  function nextForMat(m){ for(const sh of MIDS()){ const bs=flat(sh); const i=bs.findIndex((b,j)=>{ const x=state[key(sh,j)]||{}; return x.queued===true&&x.start==null&&!isF(b,x)&&(x.onMat||sh)===m; }); if(i>=0) return {sh,i}; }
+    for(const sh of [m,...sheetsOf(m).filter(x=>x!==m)]){ if(!MATS[sh]) continue; const i=nextUp(sh); if(i>=0) return {sh,i}; } return null; }
   function renderCard(m){
     let el=$('card-'+m); if(!el){ el=document.createElement('div'); el.id='card-'+m; document.querySelector('.cards').appendChild(el); } el.className='card c'+(cidx(m)%6);
     const M=matModel(m,+$('rate').value||4.3); const tk=trackedKey();
@@ -493,7 +495,7 @@ window.MT_DB=(function(){
       items.forEach(o=>{ h+='<button type="button" data-pick="'+key(sh,o.i)+'">#'+(o.i+1)+' · '+esc(o.b[0])+' · '+esc(o.b[1])+' vs '+esc(o.b[2])+'</button>'; }); });
     h+='</div><div class="acts"><button type="button" data-close="1">Cancel</button></div>';
     showDlg(h,e=>{ const p=e.target.closest('[data-pick]'); if(!p) return; const pk=p.dataset.pick; const [sh]=unkey(pk);
-      Object.keys(state).forEach(kk=>{ if(state[kk].queued&&unkey(kk)[0]===m) commit(kk,{queued:null}); });
+      Object.keys(state).forEach(kk=>{ if(kk!==pk&&state[kk].queued&&state[kk].start==null&&(state[kk].onMat||unkey(kk)[0])===m) commit(kk,{queued:null,onMat:null}); });
       commit(pk,{queued:true,onMat:sh===m?null:m},'Next on '+MATS[m].name+': #'+(unkey(pk)[1]+1)); closeDlg(); });
   }
   // per-bout editor (the only place times are typed)
