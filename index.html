@@ -371,8 +371,33 @@ window.MT_DB=(function(){
   }
   // bouts a sheet still has to run: waiting bouts after its furthest logged position in running order (all of them if nothing logged yet)
   function remainingOn(sh){ const O=order(sh); const bouts=flat(sh); let lastP=-1; O.forEach((i,p)=>{ const x=state[key(sh,i)]||{}; if(x.start!=null||x.end!=null) lastP=p; }); let n=0; O.forEach((i,p)=>{ const x=state[key(sh,i)]||{}; if(p>lastP&&!isF(bouts[i],x)&&x.start==null) n++; }); return n; }
+  // No sheet yet (nobody at the gym): estimate the tracked wrestler from his weight, last meets' bouts per weight, and Flo's results so far.
+  // meet.est = {name, wts:[110,115], startWt, jv:{wt:count}, varN, drive, lag}
+  function projectEst(){
+    const E=(meetsIdx[MEET.id]||{}).est; if(!E||!E.jv||!E.wts) return false;
+    const now=nowMin(); const pr=(MEET.prior&&MEET.prior.all)||{dur:2.5,gap:1.8}; const p=E.pace||((pr.dur||2.5)+(pr.gap||1.8));
+    const W=Object.keys(E.jv).map(Number).sort((a,b)=>a-b); let s0=W.findIndex(w=>w>=(E.startWt||W[0])); if(s0<0) s0=0; const O=W.slice(s0).concat(W.slice(0,s0)); const ix=w=>{ const i=O.indexOf(+w); return i<0?O.length:i; };
+    const ids=floIds(); const jvEv=ids[0], vEv=ids[1]; const obs=Object.keys(floObs).map(k=>floObs[k]).filter(o=>o&&o.endMs);
+    const jvO=obs.filter(o=>o.ev===jvEv), vO=obs.filter(o=>o.ev===vEv);
+    const done={}; jvO.forEach(o=>{ done[+o.wt]=(done[+o.wt]||0)+1; });
+    const last=jvO.slice().sort((a,b)=>a.endMs-b.endMs).pop(); const front=last?ix(last.wt):-1;
+    const lag=E.lag!=null?E.lag:3.3; const lastMs=obs.reduce((m,o)=>Math.max(m,o.endMs),0);
+    const st=toMin(MEET.start||'15:15'); const t0=lastMs?Math.max(msToMin(lastMs)-lag,st):Math.max(now,st); const t0e=lastMs?t0:st;   // nothing posted: earliest assumes the mats started on time and the scorer is behind
+    const before=k=>{ let n=0; O.forEach((w,i)=>{ if(i<k&&i>=front) n+=i===front?Math.max(0,E.jv[w]-(done[w]||0)):E.jv[w]; }); return n; };
+    const k0=ix(E.wts[0]), k1=ix(E.wts[E.wts.length-1]);
+    const nEarly=before(k0), nMid=before(k0)+Math.max(0,(before(k1)+E.jv[O[k1]]-before(k0))/2), nLate=before(k1)+E.jv[O[k1]];
+    const vRem=Math.max(0,(E.varN||20)-vO.length);
+    const at=(n,pc,a)=>{ a=a==null?t0:a; const tV=a+vRem*pc; const tj=a+n*pc; if(tj<=tV) return tj; const nj=(tV-a)/pc; return tV+(n-nj)*pc/2; };
+    const early=Math.max(now,at(nEarly,p*0.85,t0e)), eta=Math.max(now,at(nMid,p)), late=Math.max(now,at(nLate,p*1.2));
+    const drive=E.drive||15, leave=early-drive, go=now>=leave;
+    $('boardLbl').textContent=(E.name||'Tracked')+' · '+E.wts.join('/')+' lb · estimate (no sheet yet)';
+    $('upText').textContent=go?'GO':'~'+Math.round(nMid); $('upSub').textContent=go?'leave now':'JV bouts ahead (est.)';
+    $('winText').textContent='earliest '+fmt(early)+' – '+fmt(late); $('etaText').textContent=fmt(eta);
+    $('noteText').textContent=(go?'GO NOW. ':'Leave by '+fmt(leave)+' ('+drive+' min drive). ')+(last?('Flo: JV at '+last.wt+' lb, '+jvO.length+' JV / '+vO.length+' Varsity results posted. '):'Flo: nothing posted yet; assuming the mats started at '+fmt(t0)+'. ')+'Built from his last meets: order starts at '+(E.startWt||O[0])+' lb, '+p.toFixed(1)+' min/bout, second mat helps after Varsity.';
+    return true;
+  }
   function project(){
-    const tv=$('track').value; const blank=()=>{ $('boardLbl').textContent='No roster loaded yet'; $('upText').textContent='—'; $('upSub').textContent='add the sheets in Meets, Edit this roster'; $('etaText').textContent='—'; $('winText').textContent='—'; $('noteText').textContent=''; }; if(!tv){ blank(); return; } const [tm,ti]=tv.split('|'); const N=+ti; const bouts=MATS[tm]?flat(tm):[]; if(!bouts[N]){ blank(); return; }
+    const tv=$('track').value; const blank=()=>{ $('boardLbl').textContent='No roster loaded yet'; $('upText').textContent='—'; $('upSub').textContent='add the sheets in Meets, Edit this roster'; $('etaText').textContent='—'; $('winText').textContent='—'; $('noteText').textContent=''; }; const Ee=(meetsIdx[MEET.id]||{}).est; if(Ee&&Ee.name&&!MIDS().some(m=>flat(m).some(b=>sameName(b[1],Ee.name)||sameName(b[2],Ee.name)))&&projectEst()) return; if(!tv){ blank(); return; } const [tm,ti]=tv.split('|'); const N=+ti; const bouts=MATS[tm]?flat(tm):[]; if(!bouts[N]){ blank(); return; }
     const r0=+$('rate').value||4.3; const start0=toMin($('startTime').value)+((MEET.prior&&MEET.prior.slip!=null)?MEET.prior.slip:15); const now=nowMin(); const own=state[key(tm,N)]||{}; const gk=key(tm,N);
     const who=(()=>{ const q=($('find').value||'').trim().toLowerCase(); const b=bouts[N]; const hit=[b[1],b[2]].find(n=>n&&q&&n.toLowerCase().includes(q)); return hit||b[2]||b[1]; })();
     $('boardLbl').textContent=who+' · '+MATS[tm].name+' #'+(N+1);
