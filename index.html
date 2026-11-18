@@ -254,7 +254,9 @@ window.MT_DB=(function(){
   const cidx=m=>Math.max(0,MIDS().indexOf(m));
   // MEET.work: sheetId -> [matIds working it]. Default: each sheet on its own mat.
   const hasFloIds=()=>{ try{ return !!(window.MT_FLO_TEST||((meetsIdx[MEET.id]||{}).flo||[]).length); }catch(e){ return false; } };
-  const workOf=sh=>{ const w=MEET.work&&MEET.work[sh]; if(w&&w.length) return w.filter(m=>MATS[m]); if(hasFloIds()) return [sh]; const idle=MIDS().filter(m=>m!==sh&&!flat(m).length); return [sh,...idle]; };
+  const sheetDone=m=>flat(m).length>0&&!flat(m).some((b,i)=>{ const x=state[key(m,i)]||{}; return !isF(b,x)&&x.start==null&&!(x.queued===true&&x.onMat&&x.onMat!==m); });
+  // a mat with an empty sheet (no Flo ids) or a finished sheet becomes a second lane on the sheets still running
+  const workOf=sh=>{ const w=MEET.work&&MEET.work[sh]; if(w&&w.length) return w.filter(m=>MATS[m]); const idle=MIDS().filter(m=>m!==sh&&(flat(m).length?sheetDone(m):!hasFloIds())); return [sh,...idle]; };
   const sheetsOf=m=>MIDS().filter(sh=>workOf(sh).includes(m));
   const flat=m=>MATS[m].sections.flatMap(s=>s.bouts);
   const key=(m,i)=>m+'-'+String(i+1).padStart(2,'0');
@@ -377,6 +379,13 @@ window.MT_DB=(function(){
     if(own.start!=null){ $('upText').textContent=own.end!=null?'DONE':'LIVE'; $('upSub').textContent=(own.end!=null?'wrestled':'on the mat')+' · '+MATS[own.onMat||tm].name; $('winText').textContent=fmts(own.start); $('etaText').textContent=fmt(own.start); $('noteText').textContent='Started '+fmts(own.start)+(own.end!=null?' · lasted '+mss(own.end-own.start):' · '+mss(now-own.start)+' elapsed')+'.'; renderScore(gk); return; }
     if(isF(bouts[N],own)){ const fl=own&&own.flo; $('upText').textContent=fl?'DONE':'FF'; $('upSub').textContent=fl?'finished on Flo':'forfeit'; $('winText').textContent=fl?'Finished':'Forfeit'; $('etaText').textContent='—'; $('noteText').textContent=fl?('FloWrestling shows this bout finished ('+fl+').'):'Marked forfeit; no bout to time.'; renderScore(gk); return; }
     const M=matModel(tm,r0); const pace=M.dur+M.gap;
+    // A: bout set as next on a mat (by hand or moved to another mat): the board follows that mat, not the sheet
+    const qm=(own.queued===true||(own.onMat&&own.onMat!==tm))?(own.onMat||tm):null;
+    if(qm){ const Mq=qm===tm?M:matModel(qm,r0); const lv=!!Mq.live; const t=lv?Math.max(Mq.free,now):now;
+      $('upText').textContent=lv?'1':'NEXT'; $('upSub').textContent=(lv?'bout ahead · ':'')+MATS[qm].name+(lv?' · 1 on the mat now':' · on deck');
+      $('winText').textContent=fmt(now)+' – '+fmt(t+2); $('etaText').textContent=fmt(t);
+      $('noteText').textContent='GO NOW. Set as next on '+MATS[qm].name+(lv?'; mat free ~'+fmt(t):'')+'.';
+      logGuess(gk,t,2,{ahead:lv?1:0,pace:Math.round(pace*100)/100,mat:qm}); renderScore(gk); return; }
     const secOf=[]; MATS[tm].sections.forEach((sec,si)=>sec.bouts.forEach(()=>secOf.push(si)));
     const O=order(tm); const P=i=>O.indexOf(i); const PN=P(N);
     const lastLoggedInSec={}; const loggedP=[]; bouts.forEach((b,i)=>{ const x=state[key(tm,i)]||{}; if(x.start!=null||x.end!=null){ lastLoggedInSec[secOf[i]]=Math.max(lastLoggedInSec[secOf[i]]??-1,P(i)); loggedP.push(P(i)); } });
@@ -387,16 +396,19 @@ window.MT_DB=(function(){
     if(nu===N) ahead=0;
     let anchor=M.free!=null?M.free:start0; const live=M.free!=null; anchor=Math.max(anchor,now);
     // lanes: every mat assigned to this sheet. A mat still working its own sheet joins once that sheet is done.
-    const lanes=workOf(tm).map(m=>{ const Mm=m===tm?M:matModel(m,r0); const floLane=hasFloIds()&&Mm.free!=null&&!Mm.live; let t=floLane?Mm.free:Math.max(Mm.free!=null?Mm.free:start0,now); const pm=Mm.dur+Mm.gap;
-      if(m!==tm){ const own=sheetsOf(m).filter(sh=>sh!==tm); own.forEach(sh=>{ t+=remainingOn(sh)*pm; }); } return {m,t,pace:pm,gap:Mm.gap}; });
-    let left=ahead; while(left>0){ lanes.sort((a,b)=>a.t-b.t); lanes[0].t+=lanes[0].pace; left--; }
-    lanes.sort((a,b)=>a.t-b.t); const lane=lanes[0]; const eta=Math.max(lane.t+lane.gap,now+(ahead>0?1:0)); const half=live?Math.max(3,1.0*ahead+2):Math.min(40,Math.max(15,0.12*ahead*pace));
+    // B: every mat is a lane on this sheet. A mat still running its own sheet joins when that sheet is done (assume it will take bouts from here).
+    const W=MEET.work&&MEET.work[tm]&&MEET.work[tm].length?workOf(tm):MIDS();
+    const mkLanes=f=>W.map(m=>{ const Mm=m===tm?M:matModel(m,r0); const floLane=hasFloIds()&&Mm.free!=null&&!Mm.live; let t=floLane?Math.max(Mm.free,now-6):Math.max(Mm.free!=null?Mm.free:start0,now); const pm=(Mm.dur+Mm.gap)*f;
+      if(m!==tm&&flat(m).length) t+=remainingOn(m)*pm; return {m,t,pace:pm,gap:Mm.gap*f}; });
+    const runL=(ls,n)=>{ let left=n; while(left>0){ ls.sort((a,b)=>a.t-b.t); ls[0].t+=ls[0].pace; left--; } ls.sort((a,b)=>a.t-b.t); return ls; };
+    const lanes=runL(mkLanes(1),ahead); const lane=lanes[0]; const eta=Math.max(lane.t+lane.gap,now+(ahead>0?1:0)); const half=live?Math.max(3,1.0*ahead+2):Math.min(40,Math.max(15,0.12*ahead*pace));
+    const fl=runL(mkLanes(0.8),ahead); const early=Math.max(now,Math.min(eta-half,fl[0].t+fl[0].gap));
     const matNames=lanes.filter(l=>l.t<=eta+half).map(l=>MATS[l.m].name); const matLabel=matNames.length>1?matNames.join(' or '):MATS[lane.m].name;
     // a bout on the mat still counts until it ends, so the number drops the moment a bout is finished
     const onNow=bouts.some((b,i)=>{ const x=state[key(tm,i)]||{}; return x.start!=null&&x.end==null&&P(i)<PN; }); const shown=ahead+(onNow?1:0);
     $('upText').textContent=shown===0?'NEXT':String(shown); $('upSub').textContent=(shown===1?'bout ahead':'bouts ahead')+' · '+matLabel+(onNow?' · 1 on the mat now':'');
-    $('winText').textContent=fmt(eta-half)+' – '+fmt(eta+half); $('etaText').textContent=fmt(eta);
-    $('noteText').textContent=(live?('Mat '+mss(M.dur)+' + setup '+mss(M.gap)+' = '+pace.toFixed(1)+' min/bout'+(M.measured?' ('+M.nd+' timed)':' (early estimate)')+'; mat free ~'+fmt(anchor)):('No bouts logged on this mat; assuming first whistle '+fmt(start0)+' at '+pace.toFixed(1)+' min/bout'))+'; '+shown+' bout'+(shown===1?'':'s')+' still ahead of him'+(onNow?' (including the one on the mat)':'')+'.';
+    $('winText').textContent='earliest '+fmt(early)+' – '+fmt(eta+half); $('etaText').textContent=fmt(eta);
+    $('noteText').textContent=(live?('Mat '+mss(M.dur)+' + setup '+mss(M.gap)+' = '+pace.toFixed(1)+' min/bout'+(M.measured?' ('+M.nd+' timed)':' (early estimate)')+'; mat free ~'+fmt(anchor)):('No bouts logged on this mat; assuming first whistle '+fmt(start0)+' at '+pace.toFixed(1)+' min/bout'))+'; '+shown+' bout'+(shown===1?'':'s')+' still ahead of him'+(onNow?' (including the one on the mat)':'')+'.'+((shown<=5||fl[0].t<=now+fl[0].pace)?' GO NOW.':'');
     logGuess(gk,eta,half,{ahead,pace:Math.round(pace*100)/100,mat:tm}); renderScore(gk);
   }
 
