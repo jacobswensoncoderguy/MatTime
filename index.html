@@ -805,7 +805,7 @@ window.MT_DB=(function(){
             if(!cur) doc={ev:ev,lvl:'',wt:fb.weightClass,a:a.name||'',c:c.name||'',aTeam:(a.team||{}).name||'',cTeam:(c.team||{}).name||'',aWin:!!a.isWinner,winType:fb.winType||'',seenMs:now,liveMs:live?now:null,endMs:fin?now:null};
             else if(fin&&!cur.endMs) doc=Object.assign({},cur,{endMs:now,aWin:!!a.isWinner,winType:fb.winType||''});
             else if(live&&!cur.liveMs&&!cur.endMs) doc=Object.assign({},cur,{liveMs:now});
-            if(doc){ delete doc.id; floObs[fb.id]=Object.assign({id:fb.id},doc); if(db){ try{ await db.collection(FLOC()).doc(fb.id).set(doc); }catch(e){} } }
+            if(doc){ delete doc.id; if(db){ try{ const ex=await db.collection(FLOC()).doc(fb.id).get(); const xd=ex&&ex.exists!==false&&ex.data?ex.data():null; if(xd){ if(xd.endMs&&doc.endMs&&!cur){ floObs[fb.id]=Object.assign({id:fb.id},xd); continue; } } await db.collection(FLOC()).doc(fb.id).set(doc); }catch(e){} } floObs[fb.id]=Object.assign({id:fb.id},doc); }   // never overwrite a stamp already recorded (the server or another phone saw it first)
           }
         }
       }
