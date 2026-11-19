@@ -511,7 +511,16 @@ window.MT_DB=(function(){
   }
   function renderTabs(){ const t=$('tabs'); const want=MIDS().map(m=>m).concat(['log']); if([...t.children].map(b=>b.dataset.tab).join()!==want.join()){ t.innerHTML=''; want.forEach(id=>{ const b=document.createElement('button'); b.type='button'; b.dataset.tab=id; b.textContent=id==='log'?'Guess log':MATS[id].name+' sheet'; t.appendChild(b); }); if(!MATS[tab]&&tab!=='log') tab=MIDS()[0]; } [...t.children].forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab)); }
   function renderWork(){ const el=$('work'); if(!el) return; el.innerHTML=''; MIDS().forEach(sh=>{ const row=document.createElement('div'); row.className='chips'; row.innerHTML='<span style="min-width:7em;font-weight:700">'+esc(MATS[sh].name)+' sheet →</span>'; MIDS().forEach(m=>{ const b=document.createElement('button'); b.type='button'; b.textContent=MATS[m].name; b.setAttribute('aria-pressed',workOf(sh).includes(m)); b.addEventListener('click',()=>{ let w=workOf(sh).slice(); if(w.includes(m)){ if(w.length>1) w=w.filter(x=>x!==m); } else w.push(m); MEET.work={...(MEET.work||{}),[sh]:w}; saveMeetDoc(); renderAll(); toast(MATS[sh].name+' sheet → '+w.map(x=>MATS[x].name).join(', ')); }); row.appendChild(b); }); el.appendChild(row); }); }
-  function renderAll(){ project(); [...document.querySelectorAll('.cards .card')].forEach(c=>{ if(!MATS[c.id.slice(5)]) c.remove(); }); MIDS().forEach(renderCard); renderTabs(); renderWork(); renderSheet(); recordSummary(); }
+  // GO NOW: a banner nobody can miss, the tab title, and a phone notification (if allowed) the first time it trips for this wrestler
+  let goSent='';
+  function goCheck(){
+    const note=$('noteText').textContent||'', on=/GO NOW/.test(note)&&!/^(DONE|LIVE)$/.test($('upText').textContent);
+    let el=$('goBanner'); if(!el){ el=document.createElement('div'); el.id='goBanner'; el.style.cssText='position:fixed;left:0;right:0;top:0;z-index:999;background:#d00;color:#fff;font:800 28px/1.2 system-ui;text-align:center;padding:18px 10px;display:none'; document.body.appendChild(el); }
+    const who=$('boardLbl').textContent.split(' · ')[0], txt='GO NOW · '+who+' · '+$('upText').textContent+' '+$('upSub').textContent;
+    el.style.display=on?'block':'none'; el.textContent=txt; document.title=on?'GO NOW · Mat Time':'Mat Time';
+    const k=MEET.id+'|'+$('track').value; if(on&&goSent!==k){ goSent=k; try{ if(window.Notification&&Notification.permission==='granted'){ navigator.serviceWorker&&navigator.serviceWorker.getRegistration?navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.showNotification('GO NOW',{body:txt}); else new Notification('GO NOW',{body:txt}); }).catch(()=>{ try{ new Notification('GO NOW',{body:txt}); }catch(e){} }):new Notification('GO NOW',{body:txt}); } }catch(e){} }
+  }
+  function renderAll(){ project(); try{ goCheck(); }catch(e){} [...document.querySelectorAll('.cards .card')].forEach(c=>{ if(!MATS[c.id.slice(5)]) c.remove(); }); MIDS().forEach(renderCard); renderTabs(); renderWork(); renderSheet(); recordSummary(); }
 
   // ---------- actions ----------
   document.querySelector('.cards').addEventListener('click',e=>{
@@ -850,5 +859,5 @@ window.MT_DB=(function(){
 })();
 </script>
 
-<div style="text-align:center;font-size:11px;opacity:.5;padding:8px">build Nov 18 5:17 PM</div>
+<div style="text-align:center;font-size:11px;opacity:.5;padding:8px">build Nov 18 5:25 PM</div>
 </body></html>
