@@ -518,7 +518,7 @@ window.MT_DB=(function(){
     let el=$('goBanner'); if(!el){ el=document.createElement('div'); el.id='goBanner'; el.style.cssText='position:fixed;left:0;right:0;top:0;z-index:999;background:#d00;color:#fff;font:800 28px/1.2 system-ui;text-align:center;padding:18px 10px;display:none'; document.body.appendChild(el); }
     const who=$('boardLbl').textContent.split(' · ')[0], txt='GO NOW · '+who+' · '+$('upText').textContent+' '+$('upSub').textContent;
     el.style.display=on?'block':'none'; el.textContent=txt; document.title=on?'GO NOW · Mat Time':'Mat Time';
-    const k=MEET.id+'|'+$('track').value; if(on&&goSent!==k){ goSent=k; try{ if(window.Notification&&Notification.permission==='granted'){ navigator.serviceWorker&&navigator.serviceWorker.getRegistration?navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.showNotification('GO NOW',{body:txt}); else new Notification('GO NOW',{body:txt}); }).catch(()=>{ try{ new Notification('GO NOW',{body:txt}); }catch(e){} }):new Notification('GO NOW',{body:txt}); } }catch(e){} }
+    const k=MEET.id+'|'+$('track').value; if(on&&goSent!==k){ goSent=k; try{ const sk='mt.go.'+k; if(!localStorage.getItem(sk)&&window.MT_NTFY){ localStorage.setItem(sk,'1'); fetch('https://ntfy.sh/'+window.MT_NTFY,{method:'POST',headers:{'Title':'GO NOW','Priority':'urgent','Tags':'rotating_light'},body:txt}).catch(()=>{}); } }catch(e){} try{ if(window.Notification&&Notification.permission==='granted'){ navigator.serviceWorker&&navigator.serviceWorker.getRegistration?navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.showNotification('GO NOW',{body:txt}); else new Notification('GO NOW',{body:txt}); }).catch(()=>{ try{ new Notification('GO NOW',{body:txt}); }catch(e){} }):new Notification('GO NOW',{body:txt}); } }catch(e){} }
   }
   function renderAll(){ project(); try{ goCheck(); }catch(e){} [...document.querySelectorAll('.cards .card')].forEach(c=>{ if(!MATS[c.id.slice(5)]) c.remove(); }); MIDS().forEach(renderCard); renderTabs(); renderWork(); renderSheet(); recordSummary(); }
 
@@ -843,7 +843,7 @@ window.MT_DB=(function(){
   (async()=>{
     db=window.MT_DB||await window.claude?.use?.('db');
     if(!db){ $('status').textContent='Not connected to shared data: saving on this phone only.'; return; }
-    await loadMeetsIdx();
+    await loadMeetsIdx(); try{ const nf=await db.collection('config').doc('notify').get(); const nd=nf&&nf.exists!==false&&nf.data?nf.data():null; if(nd&&nd.ntfy) window.MT_NTFY=nd.ntfy; }catch(e){}
     try{ const cfg=await db.collection('config').doc('current').get(); const c=cfg&&cfg.exists!==false?(cfg.data?cfg.data():cfg):null;
       let cur=c&&c.id?c.id:null;
       { const t=todayId(); if(meetsIdx[t]) cur=t; else if(!cur||cur<t||!meetsIdx[cur]){ const up=Object.keys(meetsIdx).filter(i=>i>t).sort()[0]; if(up) cur=up; } }   // open today's meet by itself; otherwise the next one coming up
@@ -859,5 +859,5 @@ window.MT_DB=(function(){
 })();
 </script>
 
-<div style="text-align:center;font-size:11px;opacity:.5;padding:8px">build Nov 18 5:25 PM</div>
+<div style="text-align:center;font-size:11px;opacity:.5;padding:8px">build Nov 18 5:28 PM</div>
 </body></html>
