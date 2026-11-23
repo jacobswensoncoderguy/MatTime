@@ -10,3 +10,6 @@ All of these read the live store with GET only; every other request is blocked i
     python3 tests/pgsim.py     # server.sql on a throwaway local Postgres with a fake Flo feed (needs a local server on /tmp/mtpg:5544)
 
 Nov 5 is not in the store, so it cannot be replayed.
+
+## Tried and not shipped (Nov 23, second run)
+Automatic no-sheet estimate (build the estimate block from the previous meet's sheet when a meet has no roster): replayed on Nov 18 with the roster removed. Before GO NOW it showed "earliest 6:09–6:53 PM" for a bout that started 5:56 PM, and GO NOW (5:40 PM) fired only because an unrelated 110 lb result happened to post at 5:39. Flo's JV results arrive out of weight order and incomplete (34 results for 50 JV rows on Nov 18, 28 for 72 on Nov 12), so "which weight is JV at" is noise. The hand-written estimate block has the same weakness. Do not rebuild this on the weight frontier; a no-sheet meet needs the sheet.
