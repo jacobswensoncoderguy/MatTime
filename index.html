@@ -31,41 +31,49 @@
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.3;margin:0;
   padding-block:0 40px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
-body::before{content:"";position:fixed;inset:0 0 auto;height:calc(env(safe-area-inset-top,0px) + 12px);z-index:4;background:linear-gradient(var(--fg) 0 env(safe-area-inset-top,0px),var(--bg) env(safe-area-inset-top,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:calc(env(safe-area-inset-top,0px) + 12px);z-index:6;background:linear-gradient(var(--fg) 0 env(safe-area-inset-top,0px),var(--bg) env(safe-area-inset-top,0px))}
 main{max-width:860px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
-button{font:inherit;cursor:pointer;border-radius:8px;padding:8px 12px;font-weight:700;background:var(--panel);color:var(--fg);border:1px solid var(--line)}
+button{font:inherit;cursor:pointer;border-radius:8px;min-height:40px;padding:8px 12px;font-weight:700;background:var(--panel);color:var(--fg);border:1px solid var(--line)}
 button:focus,input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
 button:disabled{opacity:.45;cursor:default}
-input,select{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+input,select{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0;min-height:40px}
 
 /* header */
-.hdr{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);margin-top:12px;z-index:5;background:var(--fg);color:var(--bg);border-radius:12px;padding:10px 14px 12px;display:grid;gap:8px}
+.hdr{margin-top:12px;background:var(--fg);color:var(--bg);border-radius:12px;padding:10px 14px 12px;display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+/* pinned board: an opaque strip the page colour, so rows never show above the card or through its rounded corners */
+.stickwrap{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-top:12px;margin-top:-12px}.stickwrap .hdr{margin-top:0}
 .hdr .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .hdr h1{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:.04em;text-transform:uppercase;margin:0;line-height:1}
-.hdr .meet{font-size:12px;opacity:.85;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;background:rgba(255,255,255,.1);color:var(--bg);border:0;padding:5px 10px}
+.hdr .meet{font-size:12px;opacity:.85;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;background:rgba(255,255,255,.1);color:var(--bg);border:0;padding:9px 10px}
 .hdr .meet::after{content:' ▾';opacity:.7}
+.hdr .meet.tool{flex:0 0 auto;text-align:center}.hdr .meet.tool::after{content:none}
 .dlg textarea{font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;width:100%;min-height:110px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px}
 .dlg .meetrow{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
 .dlg .meetrow small{display:block;color:var(--muted)}
 .hdr .pick{flex:1 1 200px;display:flex;gap:6px;min-width:0}
 .hdr .pick input{background:var(--bg);color:var(--fg);border:0;font-weight:600}
 .hdr .pick button{background:var(--accent);color:var(--accent-fg);border:0;white-space:nowrap}
-.hdr .big{display:grid;grid-template-columns:fit-content(56%) 1fr;gap:10px;align-items:center}
-.upin{text-align:center;background:var(--accent);color:var(--accent-fg);border-radius:10px;padding:6px 14px;min-width:96px}
+.hdr .big{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center}
+.upin{text-align:center;background:var(--accent);color:var(--accent-fg);border-radius:10px;padding:6px 10px;width:104px}
 .upin .n{font-family:var(--display);font-weight:800;font-size:40px;line-height:1}
 .upin .l{font-family:var(--display);font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.9}
 .win .who{font-family:var(--display);font-size:13px;letter-spacing:.1em;text-transform:uppercase;opacity:.75}
-.win .t{font-family:var(--display);font-weight:800;font-size:clamp(22px,6.4vw,38px);line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
-.win .eta{font-family:var(--display);font-size:18px;font-weight:600}
+.win .t{font-family:var(--display);font-weight:800;font-size:clamp(22px,7vw,38px);line-height:1.05;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.win .eta{font-family:var(--display);font-size:16px;font-weight:600}
+.win .who{overflow-wrap:anywhere}
 .win .eta b{color:var(--accent)}
 .hdr .note{font-size:12px;opacity:.8}
-.hdr .score{font-family:var(--display);font-size:13px;letter-spacing:.04em;background:rgba(255,255,255,.12);padding:4px 8px;border-radius:6px}
-.hdr .status{font-size:11px;opacity:.7;display:flex;justify-content:space-between;gap:8px;align-items:center}
-.hdr .status button{background:var(--bg);color:var(--fg);border:0;padding:4px 10px;font-size:12px}
+.score{font-size:12px;color:var(--muted);padding:0 4px}.score:empty{display:none}.score::before{content:'Guess accuracy · '}
+.hdr .status{font-size:12px;opacity:.8;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.hdr .status button{background:var(--bg);color:var(--fg);border:0;padding:9px 14px;font-size:13px}
+.hdr .status.bad{opacity:1}.hdr .status.bad #status{background:var(--accent);color:var(--accent-fg);padding:3px 8px;border-radius:6px;font-weight:700}
+.alerts{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--good);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.alerts.off{border-left-color:var(--accent)}.alerts.idle{border-left-color:var(--line)}.alerts b{font-family:var(--display);font-size:17px;letter-spacing:.04em;text-transform:uppercase}.alerts .sm{font-size:12px;color:var(--muted)}.alerts button{white-space:nowrap;min-height:44px}
+.empty{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 14px;display:grid;gap:10px;text-align:center}.empty h2{margin:0;font-family:var(--display);font-size:22px;letter-spacing:.04em;text-transform:uppercase}.empty p{margin:0;color:var(--muted);font-size:14px}.empty button{background:var(--accent);color:var(--accent-fg);border:0;font-size:17px;padding:14px;min-height:50px}
 .hdr.flash{box-shadow:inset 0 0 0 3px var(--accent)}
 
 /* mat cards */
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:10px}
 .card{border-radius:12px;border:3px solid var(--mc);background:var(--panel);overflow:hidden;display:grid;grid-template-rows:auto 1fr auto}
 .card{--mc:var(--m1)} .card.c0{--mc:var(--m1)} .card.c1{--mc:var(--m2)} .card.c2{--mc:#2a7a3b} .card.c3{--mc:#6d3fb3} .card.c4{--mc:#b36b00} .card.c5{--mc:#007a8a}
 .chips{display:flex;gap:6px;flex-wrap:wrap} .chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
@@ -90,11 +98,11 @@ input,select{font:inherit;color:var(--fg);background:var(--panel);border:1px sol
 
 /* tabs + sheet */
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
-.tabs button{flex:1 1 40%;min-width:0;padding:8px;font-family:var(--display);letter-spacing:.08em;text-transform:uppercase}
+.tabs button{flex:1 1 40%;min-width:0;padding:11px 8px;font-family:var(--display);letter-spacing:.08em;text-transform:uppercase}
 .tabs button[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .sheet{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .sheet .sec{font-family:var(--display);letter-spacing:.1em;text-transform:uppercase;font-size:12px;color:var(--muted);padding:6px 12px;background:var(--bg);border-top:1px solid var(--line)}
-.r{display:grid;grid-template-columns:2.2em 2.8em 1fr 1fr auto;gap:6px;align-items:center;padding:7px 10px;border-top:1px solid var(--line);cursor:pointer;min-height:40px}
+.r{display:grid;grid-template-columns:2.2em 2.8em 1fr 1fr auto;gap:6px;align-items:center;padding:7px 10px;border-top:1px solid var(--line);cursor:pointer;min-height:44px}
 .r .n{color:var(--muted);font-variant-numeric:tabular-nums}
 .r .w{font-weight:700}
 .r .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
@@ -105,6 +113,7 @@ input,select{font:inherit;color:var(--fg);background:var(--panel);border:1px sol
 .r.next .chip{background:var(--mc);color:#fff;border-color:var(--mc)}
 .r.ours{background:var(--gold);color:var(--gold-fg)} .r.ours .n,.r.ours .nm,.r.ours .nm.lose{color:var(--gold-fg)} .r.ours .nm:first-of-type::before{content:'★ '}
 .r.ff{opacity:.55}
+@media (max-width:360px){ .r{grid-template-columns:2em 2.6em 1fr 1fr} .r .chip{grid-column:3/-1;justify-self:start} .r .chip:empty{display:none} }
 .log{display:grid;grid-template-columns:1fr auto auto auto auto;gap:6px;padding:6px 10px;border-top:1px solid var(--line);font-size:13px;font-variant-numeric:tabular-nums}
 .log.h{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 
@@ -117,14 +126,14 @@ input,select{font:inherit;color:var(--fg);background:var(--panel);border:1px sol
 .dlg .g{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .dlg label{display:grid;gap:4px;font-size:12px;font-weight:700;color:var(--muted)}
 .dlg .tl{display:flex;gap:6px}
-.dlg .tl button{padding:6px 8px;font-size:12px}
+.dlg .tl button{padding:9px 10px;font-size:12px}
 .dlg .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .dlg .acts .save{background:var(--accent);color:var(--accent-fg);border:0}
 .dlg .acts .danger{color:var(--accent)}
 .dlg .seg{display:flex;gap:6px} .dlg .seg button{flex:1;white-space:normal} .dlg .seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .dlg .list{display:grid;gap:6px;max-height:50vh;overflow:auto} .dlg .list button{text-align:left;white-space:normal}
 details.adv{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
-details.adv summary{cursor:pointer;font-weight:700;color:var(--muted);font-size:13px}
+details.adv summary{cursor:pointer;font-weight:700;color:var(--muted);font-size:13px;padding:10px 0}
 details.adv .g{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:8px}
 details.adv label{display:grid;gap:4px;font-size:12px;font-weight:700;color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
@@ -134,25 +143,29 @@ details.adv label{display:grid;gap:4px;font-size:12px;font-weight:700;color:var(
 
 <main>
   <header class="hdr" id="hdr">
-    <div class="row"><h1>Mat Time</h1><button type="button" class="meet" id="meetTitle" title="Meets: history, new meet, roster"></button><button type="button" class="meet" id="meetStart" style="flex:0 0 auto" title="Scheduled start"></button><button type="button" class="meet" id="meetWt" style="flex:0 0 auto" title="Starting weight class"></button></div>
+    <div class="row"><h1>Mat Time</h1><button type="button" class="meet" id="meetTitle" title="Meets: history, new meet, roster"></button><button type="button" class="meet" id="meetStart" style="flex:0 0 auto" title="Scheduled start"></button><button type="button" class="meet" id="meetWt" style="flex:0 0 auto" title="Starting weight class"></button><button type="button" class="meet tool" id="meetsBtn">Meets</button><button type="button" class="meet tool" id="refresh">Refresh</button></div>
     <div class="row">
       <div class="pick"><input type="search" id="find" list="names" placeholder="Type a wrestler or weight" autocomplete="off"><datalist id="names"></datalist><button type="button" id="clearFind" title="Clear" style="background:var(--bg);color:var(--fg);border:0;padding:0 12px">×</button><button type="button" id="go">Track</button></div>
       <select id="track" hidden></select>
     </div>
+  </header>
+  <div class="stickwrap"><section class="hdr" id="board">
     <div class="big">
       <div class="upin"><div class="l">Up in</div><div class="n" id="upText">—</div><div class="l" id="upSub">bouts</div></div>
-      <div class="win"><div class="who" id="boardLbl">—</div><div class="t" id="winText">—</div><div class="eta">Best guess <b id="etaText">—</b></div></div>
+      <div class="win"><div class="who" id="boardLbl">—</div><div class="t" id="winText">—</div><div class="eta"><span id="etaLbl">Best guess</span> <b id="etaText">—</b></div></div>
     </div>
     <div class="note" id="noteText"></div>
-    <div class="score" id="scoreText"></div>
-    <div class="status"><span id="status">Connecting…</span><span style="display:flex;gap:6px"><button type="button" id="meetsBtn">Meets</button><button type="button" id="newMeetBtn" style="background:var(--accent);color:var(--accent-fg)">+ New meet</button><button type="button" id="refresh">Refresh</button></span></div>
-  </header>
+    <div class="status"><span id="status">Connecting…</span></div>
+  </section></div>
 
+  <section class="alerts idle" id="alerts"><div><b id="alertState">Alerts: checking…</b><div class="sm" id="alertSub"></div></div><button type="button" id="alertTest">Send test alert</button></section>
+  <section class="empty" id="empty" hidden><h2>No bout sheet yet</h2><p id="emptyText">Oliver's time shows up here once the bout sheets for this meet are added. Results and alerts are automatic after that.</p><button type="button" id="emptyAdd">Add bout sheets</button></section>
   <section class="cards">
   </section>
 
   <div class="tabs" role="tablist" id="tabs"></div>
   <section class="sheet" id="sheet"></section>
+  <div class="score" id="scoreText"></div>
 
   <details class="adv"><summary>Settings</summary>
     <div class="g">
@@ -182,7 +195,8 @@ window.MT_DB=(function(){
     var write=method!=='GET', pv=pin();
     if(write&&!pv){ if(/guesslog/.test(qs)||(body&&/guesslog/.test(body.path||''))) return Promise.resolve(null); var le=new Error('view only'); le.code='PIN needed'; return Promise.reject(le); }
     var hd=Object.assign({},H,extra||{}); if(pv) hd['x-mt-pin']=pv;
-    return fetch(base+qs,{method:method,headers:hd,body:body?JSON.stringify(body):undefined}).then(function(r){
+    var ac=window.AbortController?new AbortController():null, tm=ac?setTimeout(function(){ ac.abort(); },8000):0;
+    return fetch(base+qs,{method:method,headers:hd,body:body?JSON.stringify(body):undefined,signal:ac?ac.signal:undefined}).then(function(r){ clearTimeout(tm); return r; },function(e){ clearTimeout(tm); var slow=e&&e.name==='AbortError'; var te=new Error(slow?'timed out':'no connection'); te.code=slow?'timed out':'no connection'; throw te; }).then(function(r){
       return r.text().then(function(t){ if(!r.ok){ var e=new Error(t||String(r.status)); e.code=r.status; if(write&&(r.status===401||r.status===403)){ setPin(''); e.code='wrong PIN'; } throw e; } return t?JSON.parse(t):null; }); });
   }
   function snapDoc(row){ return {id:row.id,exists:true,data:function(){return row.data;}}; }
@@ -199,10 +213,10 @@ window.MT_DB=(function(){
           update:function(d){ return get().then(function(sn){ return upsert(path,id,Object.assign({},sn.exists?sn.data():{},d)); }); },
           delete:function(){ return req('DELETE','?path=eq.'+encodeURIComponent(p)); } };
       },
-      onSnapshot:function(cb,err){
+      onSnapshot:function(cb,err,ok){
         var stop=false,last=null;
         function tick(){ if(stop) return;
-          list().then(function(sn){ var sig=JSON.stringify(sn.docs.map(function(d){return [d.id,d.data()];})); if(sig!==last){ last=sig; cb(sn); } })
+          list().then(function(sn){ var sig=JSON.stringify(sn.docs.map(function(d){return [d.id,d.data()];})); if(sig!==last){ last=sig; cb(sn); } if(ok) ok(); })
             .catch(function(e){ if(err) err(e); })
             .then(function(){ if(!stop) setTimeout(tick,3000); }); }
         tick(); return function(){ stop=true; };
@@ -249,6 +263,8 @@ window.MT_DB=(function(){
   let MATS=DEFAULT_MATS;
   try{ const c=JSON.parse(localStorage.getItem('matclock.meet')||'null'); if(c&&c.id&&c.mats){ MEET=c; MATS=c.mats; } }catch(e){}
   const LS=k=>'matclock.'+MEET.id+'.'+k;
+  // this phone's saved copy of the meet (roster, Flo links, history numbers) so an offline reload shows the same board
+  const cacheMeet=()=>{ try{ const x=meetsIdx[MEET.id]||{}; localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS,_idx:{flo:x.flo||[],est:x.est||null}})); }catch(e){} };
   const BOUTS=()=>'meets/'+MEET.id+'/bouts', GLOG=()=>'meets/'+MEET.id+'/guesslog';
   const MIDS=()=>Object.keys(MATS);                       // sheet/mat ids m1..mN in order
   const cidx=m=>Math.max(0,MIDS().indexOf(m));
@@ -275,6 +291,7 @@ window.MT_DB=(function(){
   const isF=(b,s)=>{ if(s&&s.forfeit===true) return true; if(s&&s.forfeit===false) return false; return !b[1]||!b[2]; };
   const toMin=t=>{ if(!t) return null; const p=t.split(':').map(Number); return p[0]*60+p[1]+(p[2]||0)/60; };
   const fmt=m=>{ if(m==null) return '—'; m=Math.round(m); let h=Math.floor(m/60)%24, mm=m%60; const ap=h>=12?'PM':'AM'; h=h%12||12; return h+':'+String(mm).padStart(2,'0')+' '+ap; };
+  const rng=(a,b)=>{ const A=fmt(a), B=fmt(b); return (A.slice(-2)===B.slice(-2)?A.slice(0,-3):A)+' – '+B; };
   const fmts=m=>{ if(m==null) return '—'; const t=Math.round(m*60); let h=Math.floor(t/3600)%24; const ap=h>=12?'PM':'AM'; h=h%12||12; return h+':'+String(Math.floor(t/60)%60).padStart(2,'0')+':'+String(t%60).padStart(2,'0')+' '+ap; };
   const hhmmss=m=>{ if(m==null) return ''; const t=Math.round(m*60); return String(Math.floor(t/3600)).padStart(2,'0')+':'+String(Math.floor(t/60)%60).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); };
   const mss=m=>{ if(m==null) return ''; const t=Math.max(0,Math.round(m*60)); return Math.floor(t/60)+':'+String(t%60).padStart(2,'0'); };
@@ -282,8 +299,33 @@ window.MT_DB=(function(){
   const toast=t=>{ const el=$('toast'); el.textContent=t; el.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('on'),1800); };
   const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+  // ---------- connection status: one writer, plain words ----------
+  const net={ok:0,t0:Date.now(),msg:'',until:0}; let floBase='', hb=null, pushDoc={}, cfgOk=false;
+  const clock=ms=>new Date(ms).toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'});
+  const say=(t,ms)=>{ net.msg=t; net.until=Date.now()+(ms||5000); renderStatus(); };
+  function renderStatus(){
+    const el=$('status'); if(!el) return; const now=Date.now(); const fresh=net.ok&&now-net.ok<20000; let t;
+    if(!db) t=el.textContent;
+    else if(net.msg&&now<net.until) t=net.msg;
+    else if(fresh) t='Up to date · checked '+clock(net.ok);
+    else if(net.ok) t='No connection · last update '+clock(net.ok)+' · retrying';
+    else if(now-net.t0<6000) t='Connecting…';
+    else t='Still connecting · showing what this phone saved';
+    if(el.textContent!==t) el.textContent=t; el.parentElement.classList.toggle('bad',!!db&&!fresh&&now-net.t0>=6000);
+    // Flo freshness: the server job stamps config/flopoll every time it checks Flo
+    let f=floBase; const meetDay=MEET.id===todayId()&&floIds().length;
+    if(meetDay&&cfgOk){ const age=hb&&hb.ms?now-hb.ms:null; const sch=toMin(MEET.start||'16:30');
+      if(age!=null&&age<90000) f+=' · Flo checked '+clock(hb.ms);
+      else if(sch!=null&&nowMin()<sch-45) f+=' · Flo checks pick up before the start';
+      else if(nowMin()>22*60+30) f+=' · Flo checks are done for today';
+      else f+=' · Flo check stalled'+(hb&&hb.ms&&age<864e5?' since '+clock(hb.ms):''); }
+    if(f) el.dataset.flo=f; else delete el.dataset.flo;
+  }
+  // config docs in one read: Flo heartbeat, alert channel, alerts already sent by the server
+  async function cfgSync(){ if(!db) return; try{ const sn=await db.collection('config').get(); sn.docs.forEach(d=>{ const x=d.data()||{}; if(d.id==='flopoll') hb=x; else if(d.id==='push') pushDoc=x; else if(d.id==='notify'&&x.ntfy) window.MT_NTFY=x.ntfy; }); cfgOk=true; }catch(e){} try{ renderAlerts(); renderStatus(); }catch(e){} }
+
   // ---------- state + store (one doc per bout, one doc per guess; merge by updatedAtMs) ----------
-  let state={}, glog={}, db=null, tab='m1';
+  let state={}, glog={}, db=null, tab='m1', ready=false, gotB=false, gotF=false;
   const queue={}; let flushing=false;
   function mirror(){ try{ localStorage.setItem(LS('state'),JSON.stringify(state)); localStorage.setItem(LS('glog'),JSON.stringify(glog)); }catch(e){} }
   function loadLocal(){ try{ state=JSON.parse(localStorage.getItem(LS('state'))||'{}')||{}; }catch(e){ state={}; } try{ glog=JSON.parse(localStorage.getItem(LS('glog'))||'{}')||{}; }catch(e){ glog={}; } }
@@ -291,7 +333,7 @@ window.MT_DB=(function(){
     if(flushing||!db) return; flushing=true;
     for(const k of Object.keys(queue)){ delete queue[k];
       try{ if(k.startsWith('g:')){ const id=k.slice(2); if(glog[id]) await db.collection(GLOG()).doc(id).set(glog[id]); } else if(state[k]) { await db.collection(BOUTS()).doc(k).set(state[k]); } }
-      catch(e){ queue[k]=1; $('status').textContent='Save failed ('+(e.code||e.message)+'), retrying…'; setTimeout(flush,3000); } }
+      catch(e){ queue[k]=1; say('Save failed ('+(e.code||e.message)+'), retrying…',6000); setTimeout(flush,3000); } }
     flushing=false; if(Object.keys(queue).length) flush();
   }
   // The one write path. Everything that changes a bout goes through here, and everything re-renders after it.
@@ -389,27 +431,30 @@ window.MT_DB=(function(){
     const vRem=Math.max(0,(E.varN||20)-vO.length);
     const at=(n,pc,a)=>{ a=a==null?t0:a; const tV=a+vRem*pc; const tj=a+n*pc; if(tj<=tV) return tj; const nj=(tV-a)/pc; return tV+(n-nj)*pc/2; };
     const early=Math.max(now,at(nEarly,p*0.85,t0e)), eta=Math.max(now,at(nMid,p)), late=Math.max(now,at(nLate,p*1.2));
-    const drive=E.drive||15, leave=early-drive, go=now>=leave;
+    const drive=E.drive||15, leave=early-drive, go=now>=leave&&MEET.id===todayId(); $('scoreText').textContent='';
     $('boardLbl').textContent=(E.name||'Tracked')+' · '+E.wts.join('/')+' lb · estimate (no sheet yet)';
     $('upText').textContent=go?'GO':'~'+Math.max(0,Math.round(nMid-(!lastMs&&E.started?Math.max(0,now-t0)/p:0))); $('upSub').textContent=go?'leave now':'JV bouts ahead (est.)';
-    $('winText').textContent='earliest '+fmt(early)+' – '+fmt(late); $('etaText').textContent=fmt(eta);
+    $('winText').textContent=rng(early,late); $('etaLbl').textContent='Window · best guess'; $('etaText').textContent=fmt(eta);
     $('noteText').textContent=(go?'GO NOW. ':'Leave by '+fmt(leave)+' ('+drive+' min drive). ')+(last?('Flo: JV at '+last.wt+' lb, '+jvO.length+' JV / '+vO.length+' Varsity results posted. '):'Flo: nothing posted yet; '+(E.started?'mats started at '+fmt(t0)+' (reported), scorer behind. ':'assuming the mats start at '+fmt(t0)+'. '))+'Built from his last meets: order starts at '+(E.startWt||O[0])+' lb, '+p.toFixed(1)+' min/bout, second mat helps after Varsity.';
     return true;
   }
   function project(){
-    const tv=$('track').value; const blank=()=>{ $('boardLbl').textContent='No roster loaded yet'; $('upText').textContent='—'; $('upSub').textContent='add the sheets in Meets, Edit this roster'; $('etaText').textContent='—'; $('winText').textContent='—'; $('noteText').textContent=''; }; const Ee=(meetsIdx[MEET.id]||{}).est; if(Ee&&Ee.name&&!MIDS().some(m=>flat(m).some(b=>sameName(b[1],Ee.name)||sameName(b[2],Ee.name)))&&projectEst()) return; if(!tv){ blank(); return; } const [tm,ti]=tv.split('|'); const N=+ti; const bouts=MATS[tm]?flat(tm):[]; if(!bouts[N]){ blank(); return; }
-    const r0=+$('rate').value||4.3; const start0=toMin($('startTime').value)+((MEET.prior&&MEET.prior.slip!=null)?MEET.prior.slip:15); const now=nowMin(); const own=state[key(tm,N)]||{}; const gk=key(tm,N);
+    const tv=$('track').value; const blank=()=>{ $('boardLbl').textContent='Waiting for the bout sheet'; $('upText').textContent='—'; $('upSub').textContent='no sheet yet'; $('etaLbl').textContent='Best guess'; $('etaText').textContent='—'; $('winText').textContent='—'; $('noteText').textContent=''; $('scoreText').textContent=''; }; const Ee=(meetsIdx[MEET.id]||{}).est; if(Ee&&Ee.name&&!MIDS().some(m=>flat(m).some(b=>sameName(b[1],Ee.name)||sameName(b[2],Ee.name)))&&projectEst()) return; if(!tv){ blank(); return; } const [tm,ti]=tv.split('|'); const N=+ti; const bouts=MATS[tm]?flat(tm):[]; if(!bouts[N]){ blank(); return; }
+    const r0=+$('rate').value||4.3; const start0=toMin($('startTime').value)+((MEET.prior&&MEET.prior.slip!=null)?MEET.prior.slip:15); const now=MEET.id>todayId()?0:nowMin(); const own=state[key(tm,N)]||{};   // a meet on a later day is projected from its own start, not from today's clock
+     const gk=key(tm,N);
     const who=(()=>{ const q=($('find').value||'').trim().toLowerCase(); const b=bouts[N]; const hit=[b[1],b[2]].find(n=>n&&q&&n.toLowerCase().includes(q)); return hit||b[2]||b[1]; })();
     $('boardLbl').textContent=who+' · '+MATS[tm].name+' #'+(N+1);
-    if(own.start!=null){ $('upText').textContent=own.end!=null?'DONE':'LIVE'; $('upSub').textContent=(own.end!=null?'wrestled':'on the mat')+' · '+MATS[own.onMat||tm].name; $('winText').textContent=fmts(own.start); $('etaText').textContent=fmt(own.start); $('noteText').textContent='Started '+fmts(own.start)+(own.end!=null?' · lasted '+mss(own.end-own.start):' · '+mss(now-own.start)+' elapsed')+'.'; renderScore(gk); return; }
-    if(isF(bouts[N],own)){ const fl=own&&own.flo; $('upText').textContent=fl?'DONE':'FF'; $('upSub').textContent=fl?'finished on Flo':'forfeit'; $('winText').textContent=fl?'Finished':'Forfeit'; $('etaText').textContent='—'; $('noteText').textContent=fl?('FloWrestling shows this bout finished ('+fl+').'):'Marked forfeit; no bout to time.'; renderScore(gk); return; }
+    if(own.start!=null){ $('upText').textContent=own.end!=null?'DONE':'LIVE'; $('upSub').textContent=(own.end!=null?'wrestled':'on the mat')+' · '+MATS[own.onMat||tm].name; $('winText').textContent=fmts(own.start); $('etaLbl').textContent='Started'; $('etaText').textContent=fmt(own.start); $('noteText').textContent='Started '+fmts(own.start)+(own.end!=null?' · lasted '+mss(own.end-own.start):' · '+mss(now-own.start)+' elapsed')+'.'; renderScore(gk); return; }
+    if(isF(bouts[N],own)){ const fl=own&&own.flo; $('upText').textContent=fl?'DONE':'FF'; $('upSub').textContent=fl?'finished on Flo':'forfeit'; $('winText').textContent=fl?'Finished':'Forfeit'; $('etaLbl').textContent=''; $('etaText').textContent='—'; $('noteText').textContent=fl?('FloWrestling shows this bout finished ('+fl+').'):'Marked forfeit; no bout to time.'; renderScore(gk); return; }
+    if(MEET.id<todayId()){ $('upText').textContent='—'; $('upSub').textContent='not timed'; $('winText').textContent='Past meet'; $('etaLbl').textContent=''; $('etaText').textContent='—'; $('noteText').textContent='This meet is over and this bout was never timed.'; renderScore(gk); return; }
+    const today=MEET.id===todayId(); const pre=today?'':'Meet day is '+dateLbl(MEET.id)+'; times assume an on-time start. ';
     const M=matModel(tm,r0); const pace=M.dur+M.gap;
     // A: bout set as next on a mat (by hand or moved to another mat): the board follows that mat, not the sheet
     const qm=(own.queued===true||(own.onMat&&own.onMat!==tm))?(own.onMat||tm):null;
     if(qm){ const Mq=qm===tm?M:matModel(qm,r0); const lv=!!Mq.live; const t=lv?Math.max(Mq.free,now):now;
       $('upText').textContent=lv?'1':'NEXT'; $('upSub').textContent=(lv?'bout ahead · ':'')+MATS[qm].name+(lv?' · 1 on the mat now':' · on deck');
-      $('winText').textContent=fmt(now)+' – '+fmt(t+2); $('etaText').textContent=fmt(t);
-      $('noteText').textContent='GO NOW. Set as next on '+MATS[qm].name+(lv?'; mat free ~'+fmt(t):'')+'.';
+      $('winText').textContent=rng(now,t+2); $('etaLbl').textContent='Any minute · best guess'; $('etaText').textContent=fmt(t);
+      $('noteText').textContent=pre+(today?'GO NOW. ':'')+'Set as next on '+MATS[qm].name+(lv?'; mat free ~'+fmt(t):'')+'.';
       logGuess(gk,t,2,{ahead:lv?1:0,pace:Math.round(pace*100)/100,mat:qm}); renderScore(gk); return; }
     const secOf=[]; MATS[tm].sections.forEach((sec,si)=>sec.bouts.forEach(()=>secOf.push(si)));
     const O=order(tm); const P=i=>O.indexOf(i); const PN=P(N);
@@ -432,13 +477,15 @@ window.MT_DB=(function(){
     // a bout on the mat still counts until it ends, so the number drops the moment a bout is finished
     const onNow=bouts.some((b,i)=>{ const x=state[key(tm,i)]||{}; return x.start!=null&&x.end==null&&P(i)<PN; }); const shown=ahead+(onNow?1:0);
     $('upText').textContent=shown===0?'NEXT':String(shown); $('upSub').textContent=(shown===1?'bout ahead':'bouts ahead')+' · '+matLabel+(onNow?' · 1 on the mat now':'');
-    $('winText').textContent='earliest '+fmt(early)+' – '+fmt(eta+half); $('etaText').textContent=fmt(eta);
-    $('noteText').textContent=(live?('Mat '+mss(M.dur)+' + setup '+mss(M.gap)+' = '+pace.toFixed(1)+' min/bout'+(M.measured?' ('+M.nd+' timed)':' (early estimate)')+'; mat free ~'+fmt(anchor)):('No bouts logged on this mat; assuming first whistle '+fmt(start0)+' at '+pace.toFixed(1)+' min/bout'))+'; '+shown+' bout'+(shown===1?'':'s')+' still ahead of him'+(onNow?' (including the one on the mat)':'')+'.'+((shown<=5||fl[0].t<=now+fl[0].pace)?' GO NOW.':'');
+    $('winText').textContent=rng(early,eta+half); $('etaLbl').textContent='Window · best guess'; $('etaText').textContent=fmt(eta);
+    const started=MIDS().some(m=>onMat(m).length);   // GO NOW needs today's meet, and either the meet under way or the leave-by time reached
+    $('noteText').textContent=pre+(live?('Mat '+mss(M.dur)+' + setup '+mss(M.gap)+' = '+pace.toFixed(1)+' min/bout'+(M.measured?' ('+M.nd+' timed)':' (early estimate)')+'; mat free ~'+fmt(anchor)):('No bouts logged on this mat; assuming first whistle '+fmt(start0)+' at '+pace.toFixed(1)+' min/bout'))+'; '+shown+' bout'+(shown===1?'':'s')+' still ahead of him'+(onNow?' (including the one on the mat)':'')+'.'+((today&&(started||now>=early-20)&&(shown<=5||early<=now+20||fl[0].t<=now+fl[0].pace))?' GO NOW.'+(shown>5?' He could be up as early as '+fmt(early)+'.':''):'');
     logGuess(gk,eta,half,{ahead,pace:Math.round(pace*100)/100,mat:tm}); renderScore(gk);
   }
 
   // ---------- guess log + scoring ----------
   function logGuess(k,eta,half,extra){
+    if(!ready||MEET.id!==todayId()) return;
     const mine=Object.values(glog).filter(g=>g.k===k).sort((x,y)=>x.at-y.at); const last=mine[mine.length-1]; const now=Date.now();
     if(last&&Math.abs(last.eta-eta)<0.5&&now-last.at<5*60000) return;
     const id=k+'-'+now; glog[id]={k,at:now,eta:Math.round(eta*100)/100,half:Math.round(half*10)/10,...(extra||{})}; mirror(); queue['g:'+id]=1; flush();
@@ -481,7 +528,7 @@ window.MT_DB=(function(){
       foot='<span>'+flat(nsh).filter((b,i)=>{ const x=state[key(nsh,i)]||{}; return !isF(b,x)&&x.start==null; }).length+' waiting on '+esc(MATS[nsh].name)+' sheet</span><button type="button" class="alt" data-k="'+k+'" data-a="ff" style="padding:2px 8px;font-size:11px">Forfeit</button>';
       el.classList.add('idle');
     } else {
-      const empty=!flat(m).length; body='<div class="state"><span>'+(empty?'No sheet loaded':'Sheet complete')+'</span></div>'+(empty?'<div class="wt">Meets → Edit this roster to add a photo, or assign this mat to another sheet in Settings.</div>':''); foot='<span>'+onMat(m).length+' bouts logged</span>'; el.classList.add('idle');
+      const empty=!flat(m).length; body='<div class="state"><span>'+(empty?'No sheet loaded':'Sheet complete')+'</span></div>'+(empty?'<div class="wt">No sheet for this mat. It helps with the other sheets.</div>':''); foot='<span>'+onMat(m).length+' bouts logged</span>'; el.classList.add('idle');
     }
     el.innerHTML=head+'<div class="body">'+body+'</div><div class="foot">'+foot+'</div>';
   }
@@ -512,15 +559,33 @@ window.MT_DB=(function(){
   function renderTabs(){ const t=$('tabs'); const want=MIDS().map(m=>m).concat(['log']); if([...t.children].map(b=>b.dataset.tab).join()!==want.join()){ t.innerHTML=''; want.forEach(id=>{ const b=document.createElement('button'); b.type='button'; b.dataset.tab=id; b.textContent=id==='log'?'Guess log':MATS[id].name+' sheet'; t.appendChild(b); }); if(!MATS[tab]&&tab!=='log') tab=MIDS()[0]; } [...t.children].forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab)); }
   function renderWork(){ const el=$('work'); if(!el) return; el.innerHTML=''; MIDS().forEach(sh=>{ const row=document.createElement('div'); row.className='chips'; row.innerHTML='<span style="min-width:7em;font-weight:700">'+esc(MATS[sh].name)+' sheet →</span>'; MIDS().forEach(m=>{ const b=document.createElement('button'); b.type='button'; b.textContent=MATS[m].name; b.setAttribute('aria-pressed',workOf(sh).includes(m)); b.addEventListener('click',()=>{ let w=workOf(sh).slice(); if(w.includes(m)){ if(w.length>1) w=w.filter(x=>x!==m); } else w.push(m); MEET.work={...(MEET.work||{}),[sh]:w}; saveMeetDoc(); renderAll(); toast(MATS[sh].name+' sheet → '+w.map(x=>MATS[x].name).join(', ')); }); row.appendChild(b); }); el.appendChild(row); }); }
   // GO NOW: a banner nobody can miss, the tab title, and a phone notification (if allowed) the first time it trips for this wrestler
-  let goSent='';
+  let goSent='', goHide='';
   function goCheck(){
-    const note=$('noteText').textContent||'', on=/GO NOW/.test(note)&&!/^(DONE|LIVE)$/.test($('upText').textContent);
-    let el=$('goBanner'); if(!el){ el=document.createElement('div'); el.id='goBanner'; el.style.cssText='position:fixed;left:0;right:0;top:0;z-index:999;background:#d00;color:#fff;font:800 28px/1.2 system-ui;text-align:center;padding:18px 10px;display:none'; document.body.appendChild(el); }
-    const who=$('boardLbl').textContent.split(' · ')[0], txt='GO NOW · '+who+' · '+$('upText').textContent+' '+$('upSub').textContent;
-    el.style.display=on?'block':'none'; el.textContent=txt; document.title=on?'GO NOW · Mat Time':'Mat Time';
-    const k=MEET.id+'|'+$('track').value; if(on&&goSent!==k){ goSent=k; try{ const sk='mt.go.'+k; if(!localStorage.getItem(sk)&&window.MT_NTFY){ localStorage.setItem(sk,'1'); fetch('https://ntfy.sh/'+window.MT_NTFY,{method:'POST',headers:{'Title':'GO NOW','Priority':'urgent','Tags':'rotating_light'},body:txt}).catch(()=>{}); } }catch(e){} try{ if(window.Notification&&Notification.permission==='granted'){ navigator.serviceWorker&&navigator.serviceWorker.getRegistration?navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.showNotification('GO NOW',{body:txt}); else new Notification('GO NOW',{body:txt}); }).catch(()=>{ try{ new Notification('GO NOW',{body:txt}); }catch(e){} }):new Notification('GO NOW',{body:txt}); } }catch(e){} }
+    const note=$('noteText').textContent||'', on=/GO NOW/.test(note)&&!/^(DONE|LIVE)$/.test($('upText').textContent)&&MEET.id===todayId();
+    let el=$('goBanner'); if(!el){ el=document.createElement('div'); el.id='goBanner'; el.style.cssText='position:fixed;left:0;right:0;top:0;z-index:999;background:#d00;color:#fff;font:800 28px/1.2 system-ui;text-align:center;padding:calc(env(safe-area-inset-top,0px) + 16px) 10px 16px;display:none'; el.addEventListener('click',()=>{ goHide=el.dataset.k||''; el.style.display='none'; }); document.body.appendChild(el); }
+    const who=$('boardLbl').textContent.split(' · ')[0], txt='GO NOW · '+who+' · '+$('upText').textContent+' '+$('upSub').textContent.split(' · ')[0]+' · '+$('winText').textContent;
+    const k=MEET.id+'|'+$('track').value; el.dataset.k=k; el.style.display=(on&&goHide!==k)?'block':'none'; el.innerHTML=esc(txt)+'<div style="font:600 13px system-ui;opacity:.85;margin-top:4px">tap to hide</div>'; document.title=on?'GO NOW · Mat Time':'Mat Time';
+    if(on&&goSent!==k){ goSent=k; try{ const sk='mt.go.'+k; if(pushDoc[MEET.id+'|go']){ localStorage.setItem(sk,String(pushDoc[MEET.id+'|go'].ms||Date.now())); } else if(!localStorage.getItem(sk)&&window.MT_NTFY){ localStorage.setItem(sk,String(Date.now())); fetch('https://ntfy.sh/'+window.MT_NTFY,{method:'POST',headers:{'Title':'GO NOW','Priority':'urgent','Tags':'rotating_light'},body:txt}).catch(()=>{}); } }catch(e){} try{ if(window.Notification&&Notification.permission==='granted'){ navigator.serviceWorker&&navigator.serviceWorker.getRegistration?navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.showNotification('GO NOW',{body:txt}); else new Notification('GO NOW',{body:txt}); }).catch(()=>{ try{ new Notification('GO NOW',{body:txt}); }catch(e){} }):new Notification('GO NOW',{body:txt}); } }catch(e){} }
   }
-  function renderAll(){ project(); try{ goCheck(); }catch(e){} [...document.querySelectorAll('.cards .card')].forEach(c=>{ if(!MATS[c.id.slice(5)]) c.remove(); }); MIDS().forEach(renderCard); renderTabs(); renderWork(); renderSheet(); recordSummary(); }
+  // Alerts panel: says in plain words whether a GO NOW alert can reach a phone, and lets anyone prove it with a test.
+  function renderAlerts(){
+    const box=$('alerts'), a=$('alertState'), sub=$('alertSub'); if(!box) return; const tid=todayId(); let cls='', t, d;
+    const srv=pushDoc[MEET.id+'|go']; let loc=null; try{ loc=+localStorage.getItem('mt.go.'+MEET.id+'|'+$('track').value)||null; }catch(e){}
+    const server=!!(hb&&hb.v>=3);
+    if(!db||!cfgOk){ t='Alerts: checking…'; d=''; cls='idle'; }
+    else if(!window.MT_NTFY){ t='Alerts are off'; d='No alert channel is set up, so no phone will buzz.'; cls='off'; }
+    else if(MEET.id<tid){ t='Past meet'; d='No alerts for a meet that is over.'; cls='idle'; }
+    else if(srv||(loc&&loc>1)){ t='GO NOW alert sent '+clock((srv&&srv.ms)||loc); d='Sent once per meet. Use the test button to check your phone.'; }
+    else { t=MEET.id===tid?'Alerts are armed':'Alerts armed for '+dateLbl(MEET.id); d=server?'GO NOW buzzes your phone even when this page is closed.':'GO NOW buzzes your phone while this page is open on at least one phone.'; }
+    if(a.textContent!==t) a.textContent=t; if(!sub.dataset.hold&&sub.textContent!==d) sub.textContent=d; box.className='alerts'+(cls?' '+cls:'');
+  }
+  $('alertTest').addEventListener('click',async()=>{ const b=$('alertTest'), sub=$('alertSub'); if(!window.MT_NTFY){ toast('No alert channel set up'); return; }
+    b.disabled=true; sub.dataset.hold='1'; sub.textContent='Sending test…'; let msg;
+    try{ const r=await fetch('https://ntfy.sh/'+window.MT_NTFY,{method:'POST',headers:{'Title':'Mat Time test','Tags':'white_check_mark'},body:'Test alert sent '+clock(Date.now())+'. GO NOW will arrive the same way.'}); msg=r.ok?'Test sent '+clock(Date.now())+'. Your phone should buzz within a few seconds.':'Test failed ('+r.status+'). Try again.'; }
+    catch(e){ msg='Test failed: no connection.'; }
+    sub.textContent=msg; b.disabled=false; setTimeout(()=>{ delete sub.dataset.hold; renderAlerts(); },15000); });
+  $('emptyAdd').addEventListener('click',()=>openNewMeet(MEET.id));
+  function renderAll(){ project(); try{ goCheck(); }catch(e){} try{ renderAlerts(); const none=!MIDS().some(m=>flat(m).length); $('empty').hidden=!none; document.querySelector('.cards').hidden=none; $('tabs').hidden=none; $('sheet').hidden=none; }catch(e){} [...document.querySelectorAll('.cards .card')].forEach(c=>{ if(!MATS[c.id.slice(5)]) c.remove(); }); MIDS().forEach(renderCard); renderTabs(); renderWork(); renderSheet(); recordSummary(); }
 
   // ---------- actions ----------
   document.querySelector('.cards').addEventListener('click',e=>{
@@ -574,8 +639,9 @@ window.MT_DB=(function(){
   // meets/<id> doc = {id,title,start,mats,track,split,prior:{m1:{dur,gap},m2:{dur,gap},slip},summary:{m1:{dur,gap,n},m2:{...},slip,bouts,updatedAtMs}}
   // config/current = {id}. The app writes the running summary once a minute; a new meet's prior is the average of all summaries.
   let meetsIdx={}; let lastSummary=0;
+  try{ if(MEET._idx) meetsIdx[MEET.id]={...MEET._idx,id:MEET.id,title:MEET.title,start:MEET.start,track:MEET.track,mats:MATS}; }catch(e){}
   function meetDoc(){ return {...(meetsIdx[MEET.id]||{}),id:MEET.id,title:MEET.title,start:MEET.start,mats:MATS,track:MEET.track,startWt:MEET.startWt||null,startAt:MEET.startAt||null,work:MEET.work||null,prior:MEET.prior||null,summary:(meetsIdx[MEET.id]||{}).summary||null,updatedAtMs:Date.now()}; }
-  function saveMeetDoc(){ if(window.MT_DB&&window.MT_NEEDPIN&&!window.MT_NEEDPIN()){ toast('View only: PIN needed to make changes'); return; } const d=meetDoc(); d.updatedAtMs=Date.now(); meetsIdx[MEET.id]=d; try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){} if(db) db.collection('meets').doc(MEET.id).set(d).catch(()=>{}); }
+  function saveMeetDoc(){ if(window.MT_DB&&window.MT_NEEDPIN&&!window.MT_NEEDPIN()){ toast('View only: PIN needed to make changes'); return; } const d=meetDoc(); d.updatedAtMs=Date.now(); meetsIdx[MEET.id]=d; cacheMeet(); if(db) db.collection('meets').doc(MEET.id).set(d).catch(()=>{}); }
   function statsAll(m){ // whole-meet version of stats(): every timed bout on the mat
     const rows=onMat(m); let d=[],g=[];
     rows.forEach((r,k)=>{ const x=r.x; if(x.start!=null&&x.end!=null&&x.end>=x.start&&x.end-x.start<15) d.push(x.end-x.start);
@@ -592,8 +658,8 @@ window.MT_DB=(function(){
   const dateLbl=id=>{ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(id||''); if(!m) return ''; const d=new Date(+m[1],+m[2]-1,+m[3]); return d.toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'}); };
   const todayId=()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
   function recordSummary(){ if(!db||Date.now()-lastSummary<60000||MEET.id!==todayId()) return; const sm=meetSummary(); if(!MIDS().some(m=>sm[m])) return; lastSummary=Date.now(); meetsIdx[MEET.id]={...(meetsIdx[MEET.id]||{}),summary:sm}; try{ db.collection('meets').doc(MEET.id).update({summary:sm}).catch(()=>{}); }catch(e){} }
-  function priorsFromHistory(){
-    const S=Object.values(meetsIdx).map(x=>x.summary).filter(x=>x&&MIDS().some(m=>x[m])); const pr={};
+  function priorsFromHistory(before){
+    const S=Object.keys(meetsIdx).filter(id=>!before||id<before).map(id=>meetsIdx[id].summary).filter(x=>x&&Object.keys(x).some(k=>/^m\d/.test(k)&&x[k])); const pr={};
     const all=S.flatMap(x=>Object.keys(x).filter(k=>/^m\d/.test(k)).map(k=>x[k])).filter(Boolean);
     if(all.length) pr.all={dur:+(all.reduce((a,b)=>a+b.dur,0)/all.length).toFixed(2),gap:+(all.reduce((a,b)=>a+b.gap,0)/all.length).toFixed(2),n:all.length};
     const sl=S.map(x=>x.slip).filter(x=>x!=null&&Math.abs(x)<=45); pr.slip=sl.length?+(sl.reduce((a,b)=>a+b,0)/sl.length).toFixed(1):15; pr.from=S.length; return pr;
@@ -612,11 +678,12 @@ window.MT_DB=(function(){
     return sections;
   }
   function rosterText(mat){ return (mat.sections||[]).map(sec=>'## '+sec.label+'\n'+sec.bouts.map(b=>b[0]+'  '+(b[1]||'')+' | '+(b[2]||'')).join('\n')).join('\n'); }
+  function adoptPrior(){ if(MEET.id<todayId()) return; const pr=priorsFromHistory(MEET.id); if(pr.all) MEET.prior=pr; }
   async function loadMeetsIdx(){ if(!db) return; try{ const ms=await db.collection('meets').get(); ms.docs.forEach(d=>{ meetsIdx[d.id]=d.data()||{}; }); }catch(e){} }
   async function switchMeet(id){
     const c=meetsIdx[id]; if(!c||!c.mats){ toast('No roster stored for '+id); return; }
-    MEET={id:c.id||id,title:c.title,start:c.start,track:c.track,prior:c.prior||null,startWt:c.startWt||null,startAt:c.startAt||null,work:c.work||null}; MATS=c.mats;
-    try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){}
+    MEET={id:c.id||id,title:c.title,start:c.start,track:c.track,prior:c.prior||null,startWt:c.startWt||null,startAt:c.startAt||null,work:c.work||null}; MATS=c.mats; adoptPrior();
+    cacheMeet();
     state={}; glog={}; buildRoster(); loadLocal(); renderAll();
     if(db){ try{ const snap=await db.collection(BOUTS()).get(); mergeSnap(snap); const gs=await db.collection(GLOG()).get(); gs.docs.forEach(d=>{ glog[d.id]=d.data(); }); mirror(); }catch(e){} subscribe(); renderAll(); }
     toast('Viewing '+MEET.title);
@@ -642,11 +709,11 @@ window.MT_DB=(function(){
     const ex=editId?meetsIdx[editId]:null; const pr=ex?(ex.prior||priorsFromHistory()):priorsFromHistory();
     const today=new Date(); const iso=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
     const mats=ex?ex.mats:{m1:{name:'Mat 1',sections:[]},m2:{name:'Mat 2',sections:[]}}; const nMats=Object.keys(mats).length;
-    const matBlocks=n=>Array.from({length:n},(_,q)=>{ const id='m'+(q+1); const mat=mats[id]||{name:'Mat '+(q+1),sections:[]}; return '<div style="border-top:1px solid var(--line);padding-top:8px"><label>'+esc(mat.name)+' sheet photo(s) <input type="file" id="nm-ph-'+id+'" accept="image/*" multiple></label><label>'+esc(mat.name)+' sheet (one bout per line: weight, Eagle name | opponent name; "## Varsity" starts a section)<textarea id="nm-'+id+'" placeholder="## JV&#10;85  Colton Licht | Gemonie Abney">'+esc(rosterText(mat))+'</textarea></label></div>'; }).join('');
+    const matBlocks=n=>Array.from({length:n},(_,q)=>{ const id='m'+(q+1); const mat=mats[id]||{name:'Mat '+(q+1),sections:[]}; return '<div style="border-top:1px solid var(--line);padding-top:8px">'+(window.claude?'<label>'+esc(mat.name)+' sheet photo(s) <input type="file" id="nm-ph-'+id+'" accept="image/*" multiple></label>':'')+'<label>'+esc(mat.name)+' sheet (one bout per line: weight, Eagle name | opponent name; "## Varsity" starts a section)<textarea id="nm-'+id+'" placeholder="## JV&#10;85  Colton Licht | Gemonie Abney">'+esc(rosterText(mat))+'</textarea></label></div>'; }).join('');
     let h='<h3>'+(ex?'Edit meet':'New meet')+'</h3><div class="g"><label>Opponent / title <input id="nm-title" value="'+esc(ex?ex.title:'Eagle vs ')+'"></label><label>Date <input type="date" id="nm-date" value="'+esc(ex?ex.id:iso)+'"'+(ex?' disabled':'')+'></label>'
       +'<label>FloWrestling links (optional: paste the JV and Varsity event links) <input id="nm-flo" placeholder="https://www.flowrestling.org/events/..." value="'+esc(ex&&ex.flo?ex.flo.map(x=>'https://www.flowrestling.org/events/'+x).join(' '):'')+'"></label><label>Scheduled start <input type="time" id="nm-start" value="'+esc(ex?ex.start:'16:30')+'"></label><label>Starting weight class (blank = lightest) <input type="number" id="nm-startwt" min="60" max="300" value="'+esc(ex&&ex.startWt?ex.startWt:'')+'" placeholder="e.g. 110"></label>'
       +'<label>Number of mats <select id="nm-nmats">'+[1,2,3,4,5,6].map(n=>'<option value="'+n+'"'+(n===nMats?' selected':'')+'>'+n+'</option>').join('')+'</select></label></div>'
-      +'<div id="nm-ocr" class="hint" style="font-size:12px;color:var(--muted)">Snap or pick a photo per mat; the rows appear below for a quick check. Mats with an empty sheet are fine (they can work another sheet via Settings).</div>'
+      +'<div id="nm-ocr" class="hint" style="font-size:12px;color:var(--muted)">'+(window.claude?'Snap or pick a photo per mat; the rows appear below for a quick check. ':'Type or paste one bout per line. ')+'Mats with an empty sheet are fine.</div>'
       +'<div id="nm-mats">'+matBlocks(nMats)+'</div>'
       +'<div class="warn" style="border-color:var(--line)">Starting assumptions from history: '+(pr.all?'mat '+mss(pr.all.dur)+' + setup '+mss(pr.all.gap)+' per bout (pooled over '+pr.all.n+' mat-meets) · ':'')+'first whistle '+(pr.slip>=0?'+':'')+pr.slip+' min. Replaced by live numbers as bouts are timed.</div>'
       +'<div id="nm-preview" class="hint" style="font-size:12px;color:var(--muted)"></div>'
@@ -696,7 +763,6 @@ window.MT_DB=(function(){
   });
   $('startTime').addEventListener('change',()=>{ MEET.start=$('startTime').value||MEET.start; saveMeetDoc(); $('meetStart').textContent='Starts '+fmt(toMin(MEET.start)); });
   $('meetsBtn').addEventListener('click',openMeets);
-  $('newMeetBtn').addEventListener('click',()=>openNewMeet(null));
   let dlgHandler=null;
   function showDlg(html,handler){ $('dlg').innerHTML=html; $('modal').classList.add('open'); dlgHandler=handler; }
   function closeDlg(){ $('modal').classList.remove('open'); dlgHandler=null; }
@@ -730,9 +796,9 @@ window.MT_DB=(function(){
     const btn=$('refresh'); btn.disabled=true; btn.textContent='…';
     if(db){ try{ const snap=await Promise.race([db.collection(BOUTS()).get(), new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000))]); mergeSnap(snap);
         const gs=await db.collection(GLOG()).get(); gs.docs.forEach(d=>{ glog[d.id]=d.data(); }); mirror();
-        $('status').textContent='Refreshed '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'})+' · '+snap.docs.length+' rows'; }
-      catch(e){ $('status').textContent='Refresh failed: '+(e.code||e.message); } }
-    renderAll(); $('hdr').classList.add('flash'); setTimeout(()=>$('hdr').classList.remove('flash'),500); btn.disabled=false; btn.textContent='Refresh';
+        net.ok=Date.now(); say('Refreshed '+clock(net.ok),3000); }
+      catch(e){ say('Refresh failed: '+(e.code||e.message),6000); } }
+    renderAll(); $('board').classList.add('flash'); setTimeout(()=>$('board').classList.remove('flash'),500); btn.disabled=false; btn.textContent='Refresh';
   }
   const freshUrl=()=>location.pathname+'?v='+Date.now();
   let srcSig=null;
@@ -745,7 +811,8 @@ window.MT_DB=(function(){
     document.addEventListener('touchend',()=>{ if(armed){ toast('Refreshing…'); checkBuild(true); } y0=null; armed=false; },{passive:true}); })();
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') hardRefresh(); });
   // live tick: elapsed clocks and the now-floor on the projection, once a second; full redraw every 20 s
-  setInterval(()=>{ MIDS().forEach(m=>{ const M=matModel(m,0); const c=$('clk-'+m); if(c&&M.live) c.textContent=mss(nowMin()-M.live.x.start); }); project(); },1000);
+  setInterval(()=>{ MIDS().forEach(m=>{ const M=matModel(m,0); const c=$('clk-'+m); if(c&&M.live) c.textContent=mss(nowMin()-M.live.x.start); }); project(); renderStatus(); },1000);
+  setInterval(cfgSync,15000);
 
   // Flo auto-advance: a bout that shows a winner on FloWrestling is marked done, so "bouts ahead" stays right without tapping.
   const FLO='https://prod-web-api.flowrestling.org/api/event-hub/';
@@ -792,11 +859,11 @@ window.MT_DB=(function(){
       state[k]={start:st0,end:end,flo:wt||'done',winner:win,auto:true};
     }
     const n=Object.keys(floObs).length; const lastMs=obs.reduce((m,o)=>Math.max(m,o.endMs||o.liveMs||0),0); const quiet=(lastMs&&MEET.id===todayId())?Math.floor((Date.now()-lastMs)/60000):0;
-    floNote(n?('Flo: '+n+' bouts listed · '+fin+' finished'+(miss?' · '+miss+' not on a sheet':'')+(quiet>=8?' · no new result for '+quiet+' min, estimate assumes the mats kept moving':'')):(floIds().length?'Flo: nothing posted yet':''));
+    floBase=(n?('Flo: '+n+' bouts listed · '+fin+' finished'+(miss?' · '+miss+' not on a sheet':'')+(quiet>=8?' · no new result for '+quiet+' min, estimate assumes the mats kept moving':'')):(floIds().length?(MEET.id>todayId()?'Flo results start on meet day':'Flo: nothing posted yet'):'')); renderStatus();
   }
   function onFlo(){ floRoster(); applyFlo(); if(!$('modal').classList.contains('open')) renderAll(); else project(); }
   function floSubscribe(){ try{ if(floUnsub) floUnsub(); }catch(e){} floUnsub=null; floObs={}; if(!db||!floIds().length) return;
-    try{ floUnsub=db.collection(FLOC()).onSnapshot(snap=>{ const o={}; snap.docs.forEach(d=>{ o[d.id]=Object.assign({id:d.id},d.data()||{}); }); floObs=o; onFlo(); },()=>{}); }catch(e){} }
+    try{ floUnsub=db.collection(FLOC()).onSnapshot(snap=>{ const o={}; snap.docs.forEach(d=>{ o[d.id]=Object.assign({id:d.id},d.data()||{}); }); floObs=o; gotF=true; ready=gotB&&gotF; onFlo(); },()=>{}); }catch(e){} }
   // Fallback only: if the server job has not checked in for 90 s, an unlocked phone records what Flo shows.
   async function floSync(){
     const ids=floIds(); if(!ids.length||floBusy||MEET.id!==todayId()) return;
@@ -819,7 +886,7 @@ window.MT_DB=(function(){
         }
       }
       onFlo();
-    }catch(e){ floNote('Flo: read failed'); }
+    }catch(e){ floBase='Flo: read failed'; }
     floBusy=false;
   }
   window.MT_FLOSYNC=floSync;
@@ -827,15 +894,15 @@ window.MT_DB=(function(){
   setInterval(()=>{ if(!$('modal').classList.contains('open')) renderAll(); },20000);
 
   let unsub=null;
-  function subscribe(){ if(!db) return; try{ floSubscribe(); }catch(e){} try{ if(unsub) unsub(); }catch(e){} try{ unsub=db.collection(BOUTS()).onSnapshot(snap=>{ mergeSnap(snap); try{ applyFlo(); }catch(e){} if(!$('modal').classList.contains('open')) renderAll(); else project(); $('status').textContent='Live · '+(MEET.title||MEET.id)+' · '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'}); },err=>{ $('status').textContent='Sync error: '+(err.code||err.message); }); }catch(e){ $('status').textContent='Sync unavailable: '+(e.code||e.message); } }
+  function subscribe(){ if(!db) return; ready=false; gotB=false; gotF=!floIds().length; try{ floSubscribe(); }catch(e){} try{ if(unsub) unsub(); }catch(e){} try{ unsub=db.collection(BOUTS()).onSnapshot(snap=>{ mergeSnap(snap); try{ applyFlo(); }catch(e){} gotB=true; ready=gotB&&gotF; if(!$('modal').classList.contains('open')) renderAll(); else project(); },()=>{ renderStatus(); },()=>{ net.ok=Date.now(); renderStatus(); }); }catch(e){ say('Sync unavailable: '+(e.code||e.message),8000); } }
   // Pick up roster / start weight / Flo link changes made elsewhere without a reload.
   async function meetSync(){ if(!db||$('modal').classList.contains('open')) return;
     try{ const sn=await db.collection('meets').doc(MEET.id).get(); if(!sn||sn.exists===false) return; const x=sn.data(); if(!x||!x.mats) return;
       const old=meetsIdx[MEET.id]||{}; if((x.updatedAtMs||0)<=(old.updatedAtMs||0)) return;
       const floChanged=JSON.stringify(x.flo||[])!==JSON.stringify(old.flo||[]); meetsIdx[MEET.id]=x;
       MEET={id:MEET.id,title:x.title,start:x.start,track:x.track,prior:x.prior||null,startWt:x.startWt||null,startAt:x.startAt||null,work:x.work||null};
-      if(JSON.stringify(x.mats)!==JSON.stringify(MATS)) MATS=x.mats;
-      try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){}
+      if(JSON.stringify(x.mats)!==JSON.stringify(MATS)) MATS=x.mats; adoptPrior();
+      cacheMeet();
       buildRoster(); if(floChanged){ try{ floSubscribe(); }catch(e){} } try{ floRoster(); }catch(e){} try{ applyFlo(); }catch(e){} renderAll(); toast('Meet updated');
     }catch(e){} }
   setInterval(meetSync,20000);
@@ -843,14 +910,15 @@ window.MT_DB=(function(){
   (async()=>{
     db=window.MT_DB||await window.claude?.use?.('db');
     if(!db){ $('status').textContent='Not connected to shared data: saving on this phone only.'; return; }
-    await loadMeetsIdx(); try{ const nf=await db.collection('config').doc('notify').get(); const nd=nf&&nf.exists!==false&&nf.data?nf.data():null; if(nd&&nd.ntfy) window.MT_NTFY=nd.ntfy; }catch(e){}
+    await loadMeetsIdx(); await cfgSync();
     try{ const cfg=await db.collection('config').doc('current').get(); const c=cfg&&cfg.exists!==false?(cfg.data?cfg.data():cfg):null;
       let cur=c&&c.id?c.id:null;
       { const t=todayId(); if(meetsIdx[t]) cur=t; else if(!cur||cur<t||!meetsIdx[cur]){ const up=Object.keys(meetsIdx).filter(i=>i>t).sort()[0]; if(up) cur=up; } }   // open today's meet by itself; otherwise the next one coming up
       if(c&&c.mats&&!meetsIdx[c.id]){ meetsIdx[c.id]=c; }   // older full-config doc
-      if(cur&&meetsIdx[cur]&&meetsIdx[cur].mats&&(cur!==MEET.id||JSON.stringify(meetsIdx[cur].mats)!==JSON.stringify(MATS))){ const x=meetsIdx[cur]; MEET={id:x.id||cur,title:x.title,start:x.start,track:x.track,prior:x.prior||null,startWt:x.startWt||null,startAt:x.startAt||null,work:x.work||null}; MATS=x.mats; try{ localStorage.setItem('matclock.meet',JSON.stringify({...MEET,mats:MATS})); }catch(e){} state={}; glog={}; buildRoster(); loadLocal(); renderAll(); }
+      if(cur&&meetsIdx[cur]&&meetsIdx[cur].mats&&(cur!==MEET.id||JSON.stringify(meetsIdx[cur].mats)!==JSON.stringify(MATS))){ const x=meetsIdx[cur]; MEET={id:x.id||cur,title:x.title,start:x.start,track:x.track,prior:x.prior||null,startWt:x.startWt||null,startAt:x.startAt||null,work:x.work||null}; MATS=x.mats; cacheMeet(); state={}; glog={}; buildRoster(); loadLocal(); renderAll(); }
       else if(cur===MEET.id&&meetsIdx[cur]&&meetsIdx[cur].prior&&!MEET.prior){ MEET.prior=meetsIdx[cur].prior; }
-    }catch(e){ $('status').textContent='Roster read failed: '+(e.code||e.message); }
+    }catch(e){}
+    adoptPrior(); cacheMeet(); renderAll();
     try{ const s0=await db.collection(BOUTS()).get(); const have={}; s0.docs.forEach(d=>{ have[d.id]=1; }); mergeSnap(s0); Object.keys(state).forEach(k=>{ if(!have[k]&&!(state[k]&&state[k].auto)) queue[k]=1; }); mirror(); }catch(e){}
     flush();
     try{ const gs=await db.collection(GLOG()).get(); gs.docs.forEach(d=>{ glog[d.id]=d.data(); }); mirror(); }catch(e){}
@@ -859,5 +927,5 @@ window.MT_DB=(function(){
 })();
 </script>
 
-<div style="text-align:center;font-size:11px;opacity:.5;padding:8px">build Nov 18 5:28 PM</div>
+<div style="text-align:center;font-size:11px;opacity:.5;padding:8px">build Nov 23 11:14 AM</div>
 </body></html>
