@@ -14,7 +14,7 @@ const MEETS=[{id:'2026-11-12',from:'16:00',to:'19:30'},{id:'2026-11-18',from:'16
     const t0=ms(M.id+'T'+M.from+':00-07:00'), t1=ms(M.id+'T'+M.to+':00-07:00');
     for(let T=t0;T<=t1;T+=5*60000){ const nm=minOf(T), tag=M.id+' '+fmt(nm);
       const a=await open({mode:'replay',meet:M.id,T,wait:1200}); const s=await snap(a.page);
-      ok(a.log.errors.length===0,tag,'page errors '+a.log.errors.join(' | ')); ok(!a.log.blocked.some(b=>/supabase/.test(b)),tag,'store write attempted: '+a.log.blocked.join(','));
+      ok(a.log.errors.length===0,tag,'page errors '+a.log.errors.join(' | ')); ok(!a.log.blocked.some(b=>/rest\/v1/.test(b)),tag,'store write attempted: '+a.log.blocked.join(','));
       ok(/Up to date/.test(s.status),tag,'status: '+s.status);
       const projecting=!/^(DONE|LIVE|FF|—)$/.test(s.up);
       if(projecting){ for(const t of times(s.win).concat(times(s.eta))) ok(t>=Math.floor(nm),tag,'guess in the past: '+s.win+' / '+s.eta);

@@ -1,3 +1,4 @@
+create schema if not exists vault; create table if not exists vault.decrypted_secrets(name text, decrypted_secret text);
 create schema if not exists extensions; create schema if not exists cron;
 create table public.docs(path text primary key, coll text, id text, data jsonb, updated_at timestamptz default now());
 create table cron.job(jobname text, schedule text, command text);
@@ -11,8 +12,9 @@ create table public.simt(t bigint); insert into public.simt values(0);
 create function extensions.http_header(f varchar, v varchar) returns extensions.http_header language sql as $$ select row(f,v)::extensions.http_header $$;
 create function extensions.http_set_curlopt(a varchar,b varchar) returns boolean language sql as $$ select true $$;
 create function extensions.urlencode(a text) returns text language sql as $$ select a $$;
-create function extensions.http(r extensions.http_request) returns extensions.http_response language plpgsql as $$ begin
-  insert into public.sent values((select t from public.simt), r.uri, (select value from unnest(r.headers) h where h.field='Title'), r.content); return row(200,'text/plain',null,'ok')::extensions.http_response; end $$;
+create function extensions.http(r extensions.http_request) returns extensions.http_response language plpgsql as $$ declare j jsonb := r.content::jsonb; begin
+  if public.mt_push_mark((j->>'meet')||'|'||(j->>'action'), '{"by":"server"}'::jsonb) then insert into public.sent values((select t from public.simt), r.uri, j->>'action', j->>'body'); end if;
+  return row(200,'application/json',null,'{}')::extensions.http_response; end $$;
 -- fake Flo: an event lists teams and bouts only once something is finished, like the real one
 create function extensions.http_get(u varchar) returns extensions.http_response language plpgsql as $$ declare e text := substring(u from 'event-hub/([A-Za-z0-9]+)'); t0 bigint := (select t from public.simt); items jsonb; begin
   select coalesce(jsonb_agg(body),'[]'::jsonb) into items from public.sim where ev=e and t<=t0;

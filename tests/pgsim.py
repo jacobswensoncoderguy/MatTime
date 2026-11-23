@@ -15,7 +15,7 @@ for meet,thr in [('2026-11-18',None),('2026-11-12',None),('noroster',None)]:
     if meet=='noroster': md['mats']={k:{'name':v['name'],'sections':[]} for k,v in md['mats'].items()}
     flo=json.load(open(S+f'fx/meets_{src}_flo.json')); bouts=json.load(open(S+f'fx/meets_{src}_bouts.json'))
     sql=f"insert into docs(path,coll,id,data) values('meets/{today}','meets','{today}',{q(md)});\n"
-    ncfg={'ntfy':'test-topic'}; 
+    ncfg={}; 
     if thr: ncfg['ahead']=thr
     sql+=f"insert into docs(path,coll,id,data) values('config/notify','config','notify',{q(ncfg)});\n"
     for r in flo:

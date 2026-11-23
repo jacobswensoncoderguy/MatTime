@@ -5,7 +5,7 @@ const fx=n=>JSON.parse(fs.readFileSync(path.join(FX,n+'.json'),'utf8'));
 const cache={};
 function curl(url){ if(cache[url]) return cache[url]; const hf=path.join(__dirname,'.h'); const body=execFileSync('curl',['-s','-L','--max-time','20','-D',hf,'-H','apikey: sb_publishable_WFqCxeR9AjQ2ecjqryETLQ_1Xx2aDV8','-A','Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1',url],{maxBuffer:5e7}); const h=fs.readFileSync(hf,'utf8'); const ct=(h.match(/content-type:\s*([^\r\n]+)/ig)||[]).pop(); return cache[url]={body,ct:ct?ct.split(':').slice(1).join(':').trim():'application/octet-stream'}; }
 let server=null, transform=null;
-function serve(){ if(server) return; server=http.createServer((q,r)=>{ let p=q.url.split('?')[0]; if(p==='/'||p==='/MatTime/') p='/index.html'; p=p.replace(/^\/MatTime/,''); const f=path.join(REPO,p); if(!fs.existsSync(f)){ r.writeHead(404); r.end(); return; } let b=fs.readFileSync(f); if(p==='/index.html'&&transform) b=Buffer.from(transform(b.toString())); r.writeHead(200,{'content-type':p.endsWith('.html')?'text/html':p.endsWith('.png')?'image/png':'application/json'}); r.end(b); }).listen(8765); }
+function serve(){ if(server) return; server=http.createServer((q,r)=>{ let p=q.url.split('?')[0]; if(p==='/'||p==='/MatTime/') p='/index.html'; p=p.replace(/^\/MatTime/,''); const f=path.join(REPO,p); if(!fs.existsSync(f)){ r.writeHead(404); r.end(); return; } let b=fs.readFileSync(f); if(p==='/index.html'&&transform) b=Buffer.from(transform(b.toString())); r.writeHead(200,{'content-type':p.endsWith('.html')?'text/html':p.endsWith('.png')?'image/png':p.endsWith('.js')?'text/javascript':'application/json'}); r.end(b); }).listen(8765); }
 const minOf=ms=>{ const d=new Date(ms-7*3600e3); return d.getUTCHours()*60+d.getUTCMinutes()+d.getUTCSeconds()/60; };
 function replayRows(coll,o){ const T=o.maskT||o.T, nm=minOf(T);
   if(coll==='config') return [{id:'current',data:{id:o.current||o.meet}},{id:'notify',data:{ntfy:'test-topic'}},{id:'flopoll',data:Object.assign({ms:o.T-4000,events:2,reached:2,changed:0,v:2},o.hb||{})}].concat(o.push?[{id:'push',data:o.push}]:[]);
@@ -26,7 +26,7 @@ async function open(o){ // o: {mode:'replay'|'live', meet, T(ms), width, height,
   page.on('pageerror',e=>log.errors.push(String(e.message))); page.on('console',m=>{ if(m.type()==='error'&&!/Failed to load resource|ERR_/.test(m.text())) log.errors.push(m.text()); });
   await page.route('**/*',async route=>{ const rq=route.request(), u=rq.url(), me=rq.method();
     if(u.startsWith('http://localhost:8765')) return route.continue();
-    if(me!=='GET'){ log.blocked.push(me+' '+u.replace(/\?.*/,'')); if(/ntfy\.sh/.test(u)) log.ntfy.push({title:rq.headers()['title'],body:rq.postData()}); return route.abort(); }
+    if(me!=='GET'){ log.blocked.push(me+' '+u.replace(/\?.*/,'')); if(/functions\/v1\/mt-push/.test(u)){ try{ const j=JSON.parse(rq.postData()); log.ntfy.push({title:j.action,body:j.body}); }catch(e){} } return route.abort(); }
     if(/supabase\.co/.test(u)){ log.gets++; if(o.offline) return route.abort(); if(o.delayMs) await new Promise(r=>setTimeout(r,o.delayMs));
       if(o.mode==='live'){ try{ const r=curl(u); return route.fulfill({status:200,contentType:'application/json',body:r.body}); }catch(e){ return route.abort(); } }
       const q=new URL(u).searchParams; const c=q.get('coll'), p=q.get('path'); let rows;

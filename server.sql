@@ -2,8 +2,8 @@
 -- What it does, every 5 seconds on a meet day (from 60 min before the scheduled start until 10:30 PM Boise):
 --   1. records what FloWrestling shows for today's meet, with a server timestamp (same as v2, the version that was live on Nov 18);
 --   2. writes a heartbeat (config/flopoll) the app shows as "Flo checked h:mm:ss";
---   3. NEW: sends the GO NOW phone alert itself through ntfy (topic in config/notify), so no phone needs the page open,
---      and one "meet under way" alert when Flo posts its first result. Each is sent once per meet and noted in config/push.
+--   3. sends the GO NOW phone alert itself as a web push (through the mt-push edge function, to every phone that turned alerts on),
+--      so no phone needs the app open, and one "meet under way" alert when Flo posts its first result. Each is sent once per meet (config/push).
 -- It never touches meets/<id>/bouts (times entered by hand).
 create extension if not exists http with schema extensions;
 create extension if not exists pg_cron;
@@ -59,6 +59,25 @@ select jsonb_build_object(
 $fn$;
 revoke execute on function public.mt_go_ahead(text, bigint) from public, anon, authenticated;
 
+-- Phones that turned alerts on (web push subscriptions). Only the mt-push function reads or writes this.
+create table if not exists public.push_subs(endpoint text primary key, sub jsonb not null, created_at timestamptz default now());
+alter table public.push_subs enable row level security;
+-- The push signing key pair is created by the mt-push function the first time it runs and kept in Supabase Vault (never in this file or the repo).
+create or replace function public.mt_vapid(p_pub text default null, p_priv text default null) returns jsonb language plpgsql security definer set search_path = public, vault as $v$
+begin
+  if p_priv is not null and p_pub is not null and not exists(select 1 from vault.secrets where name = 'mt_vapid_private') then
+    perform vault.create_secret(p_priv, 'mt_vapid_private'); perform vault.create_secret(p_pub, 'mt_vapid_public');
+  end if;
+  return (select jsonb_object_agg(name, decrypted_secret) from vault.decrypted_secrets where name in ('mt_vapid_private','mt_vapid_public'));
+end $v$;
+revoke execute on function public.mt_vapid(text, text) from public, anon, authenticated; grant execute on function public.mt_vapid(text, text) to service_role;
+-- Marks an alert as sent for a meet. Returns true only for the first caller, so an alert goes out once.
+create or replace function public.mt_push_mark(p_key text, p_info jsonb) returns boolean language sql security definer set search_path = public as
+  $v$ with x as (insert into public.docs(path,coll,id,data) values ('config/push','config','push',jsonb_build_object(p_key,p_info))
+        on conflict (path) do update set data = public.docs.data || excluded.data, updated_at = now() where not (public.docs.data ? p_key) returning 1)
+      select exists(select 1 from x) $v$;
+revoke execute on function public.mt_push_mark(text, jsonb) from public, anon, authenticated; grant execute on function public.mt_push_mark(text, jsonb) to service_role;
+
 drop function if exists public.mt_flo_poll();
 create or replace function public.mt_flo_poll(p_force boolean default false) returns integer
 language plpgsql security definer set search_path = public, extensions as $fn$
@@ -67,7 +86,8 @@ declare
   today text := to_char(nowl,'YYYY-MM-DD');
   meet jsonb; ev text; lvl text; base text; ts jsonb; tid text; r jsonb; b jsonb; cur jsonb; ncfg jsonb; pushd jsonb; g jsonb; resp record;
   p text; fin boolean; live boolean; a_win boolean; n int := 0; reached int := 0; posting int := 0; nowms bigint;
-  startm int := 990; nowm int; topic text; lim int; msg text; sent text := null;
+  startm int := 990; nowm int; lim int; msg text; sent text := null;
+  fn text := 'https://neasjlyymaufxxpprduv.supabase.co/functions/v1/mt-push';
 begin
   select data into meet from public.docs where path = 'meets/'||today;
   if meet is null or jsonb_typeof(meet->'flo') is distinct from 'array' or jsonb_array_length(meet->'flo') = 0 then return 0; end if;
@@ -118,32 +138,25 @@ begin
     end loop;
   end loop;
 
-  -- phone alerts, sent from here so they do not depend on a phone having the page open
+  -- phone alerts, sent from here so they do not depend on a phone having the app open.
+  -- The mt-push function delivers them as web push to every phone that turned alerts on, once per meet (it marks config/push).
   begin
     select data into ncfg from public.docs where path = 'config/notify';
-    topic := coalesce(ncfg->>'ntfy','');
-    if topic <> '' then
-      select coalesce((select data from public.docs where path = 'config/push'),'{}'::jsonb) into pushd;
-      g := public.mt_go_ahead(today);
-      lim := case when (ncfg->>'ahead') ~ '^\d+$' then (ncfg->>'ahead')::int else 8 end;   -- 8 bouts out: about 20 min of warning on Nov 12 and 39 min on Nov 18 (replayed from the stored results)
-      nowms := (extract(epoch from clock_timestamp())*1000)::bigint;
-      if (g->>'results')::int > 0 and not (pushd ? (today||'|first')) then
-        msg := 'First result is in at '||to_char(nowl,'FMHH12:MI AM')||'. '||case when (g->>'found')::boolean and not (g->>'done')::boolean
-                 then (g->>'who')||': '||(g->>'ahead')||' bouts ahead on '||(g->>'mat')||'. GO NOW comes at '||lim||' or fewer.'
-                 when (g->>'found')::boolean then (g->>'who')||' has already wrestled.'
-                 else 'No bout sheet is loaded, so GO NOW cannot be timed. Add the sheets in Mat Time.' end;
-        select * into resp from http(('POST','https://ntfy.sh/'||topic, array[http_header('Title','Mat Time: meet under way'),http_header('Tags','wrestling')], 'text/plain', msg)::http_request);
-        if resp.status = 200 then pushd := pushd || jsonb_build_object(today||'|first', jsonb_build_object('ms',nowms)); sent := 'first'; end if;
-      end if;
-      if (g->>'found')::boolean and not (g->>'done')::boolean and (g->>'results')::int > 0 and (g->>'ahead')::int <= lim and not (pushd ? (today||'|go')) then
-        msg := 'GO NOW · '||(g->>'who')||' · '||(g->>'ahead')||case when (g->>'ahead')::int = 1 then ' bout' else ' bouts' end||' ahead on '||(g->>'mat')||' (row '||(g->>'row')||').';
-        select * into resp from http(('POST','https://ntfy.sh/'||topic, array[http_header('Title','GO NOW'),http_header('Priority','urgent'),http_header('Tags','rotating_light')], 'text/plain', msg)::http_request);
-        if resp.status = 200 then pushd := pushd || jsonb_build_object(today||'|go', jsonb_build_object('ms',nowms,'ahead',(g->>'ahead')::int,'by','server')); sent := 'go'; end if;
-      end if;
-      if sent is not null then
-        insert into public.docs(path,coll,id,data) values ('config/push','config','push',pushd)
-          on conflict (path) do update set data = excluded.data, updated_at = now();
-      end if;
+    select coalesce((select data from public.docs where path = 'config/push'),'{}'::jsonb) into pushd;
+    g := public.mt_go_ahead(today);
+    lim := case when (ncfg->>'ahead') ~ '^\d+$' then (ncfg->>'ahead')::int else 8 end;   -- 8 bouts out: about 20 min of warning on Nov 12 and 39 min on Nov 18 (replayed from the stored results)
+    if (g->>'results')::int > 0 and not (pushd ? (today||'|first')) then
+      msg := 'First result is in at '||to_char(nowl,'FMHH12:MI AM')||'. '||case when (g->>'found')::boolean and not (g->>'done')::boolean
+               then (g->>'who')||': '||(g->>'ahead')||' bouts ahead on '||(g->>'mat')||'. GO NOW comes at '||lim||' or fewer.'
+               when (g->>'found')::boolean then (g->>'who')||' has already wrestled.'
+               else 'No bout sheet is loaded, so GO NOW cannot be timed. Add the sheets in Mat Time.' end;
+      select * into resp from http(('POST', fn, null, 'application/json', jsonb_build_object('action','first','meet',today,'by','server','body',msg)::text)::http_request);
+      sent := 'first '||resp.status;
+    end if;
+    if (g->>'found')::boolean and not (g->>'done')::boolean and (g->>'results')::int > 0 and (g->>'ahead')::int <= lim and not (pushd ? (today||'|go')) then
+      msg := (g->>'who')||' · '||(g->>'ahead')||case when (g->>'ahead')::int = 1 then ' bout' else ' bouts' end||' ahead on '||(g->>'mat')||' (row '||(g->>'row')||').';
+      select * into resp from http(('POST', fn, null, 'application/json', jsonb_build_object('action','go','meet',today,'by','server','body',msg)::text)::http_request);
+      sent := coalesce(sent||', ','')||'go '||resp.status;
     end if;
   exception when others then sent := 'error: '||sqlerrm;
   end;

@@ -565,25 +565,37 @@ window.MT_DB=(function(){
     let el=$('goBanner'); if(!el){ el=document.createElement('div'); el.id='goBanner'; el.style.cssText='position:fixed;left:0;right:0;top:0;z-index:999;background:#d00;color:#fff;font:800 28px/1.2 system-ui;text-align:center;padding:calc(env(safe-area-inset-top,0px) + 16px) 10px 16px;display:none'; el.addEventListener('click',()=>{ goHide=el.dataset.k||''; el.style.display='none'; }); document.body.appendChild(el); }
     const who=$('boardLbl').textContent.split(' · ')[0], txt='GO NOW · '+who+' · '+$('upText').textContent+' '+$('upSub').textContent.split(' · ')[0]+' · '+$('winText').textContent;
     const k=MEET.id+'|'+$('track').value; el.dataset.k=k; el.style.display=(on&&goHide!==k)?'block':'none'; el.innerHTML=esc(txt)+'<div style="font:600 13px system-ui;opacity:.85;margin-top:4px">tap to hide</div>'; document.title=on?'GO NOW · Mat Time':'Mat Time';
-    if(on&&goSent!==k){ goSent=k; try{ const sk='mt.go.'+k; if(pushDoc[MEET.id+'|go']){ localStorage.setItem(sk,String(pushDoc[MEET.id+'|go'].ms||Date.now())); } else if(!localStorage.getItem(sk)&&window.MT_NTFY){ localStorage.setItem(sk,String(Date.now())); fetch('https://ntfy.sh/'+window.MT_NTFY,{method:'POST',headers:{'Title':'GO NOW','Priority':'urgent','Tags':'rotating_light'},body:txt}).catch(()=>{}); } }catch(e){} try{ if(window.Notification&&Notification.permission==='granted'){ navigator.serviceWorker&&navigator.serviceWorker.getRegistration?navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.showNotification('GO NOW',{body:txt}); else new Notification('GO NOW',{body:txt}); }).catch(()=>{ try{ new Notification('GO NOW',{body:txt}); }catch(e){} }):new Notification('GO NOW',{body:txt}); } }catch(e){} }
+    if(on&&goSent!==k){ goSent=k; try{ const sk='mt.go.'+k; if(pushDoc[MEET.id+'|go']){ localStorage.setItem(sk,String(pushDoc[MEET.id+'|go'].ms||Date.now())); } else if(!localStorage.getItem(sk)){ localStorage.setItem(sk,String(Date.now())); pushCall({action:'go',meet:MEET.id,by:'phone',body:txt.replace(/^GO NOW · /,'')}).catch(()=>{}); } }catch(e){} }
   }
-  // Alerts panel: says in plain words whether a GO NOW alert can reach a phone, and lets anyone prove it with a test.
+  // Phone alerts = web push. Each phone turns them on once (iPhone: from the Home Screen app); the server sends GO NOW to every phone that did.
+  const PUSH_URL=window.MT_CONFIG.url+'/functions/v1/mt-push', VAPID='BPvvPo_MRWSoY6UL6LgfB1GADS-wmb2J8yyeUtlFdOBnx9fBMl-WYUtOQnGOlGuLURQaAZX0jWbCYh5BHZpCSZ4';
+  const pushCall=b=>fetch(PUSH_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json());
+  const b64url=t=>{ const p='='.repeat((4-t.length%4)%4), raw=atob((t+p).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from([...raw].map(c=>c.charCodeAt(0))); };
+  const pushOK=()=>('serviceWorker' in navigator)&&('PushManager' in window)&&('Notification' in window);
+  let pushSub=null, pushChecked=false;
+  async function pushInit(){ try{ if(!pushOK()){ pushChecked=true; renderAlerts(); return; } const reg=await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready; pushSub=await reg.pushManager.getSubscription();
+      if(pushSub&&Notification.permission==='granted') pushCall({action:'subscribe',sub:pushSub.toJSON()}).catch(()=>{}); else pushSub=null; }catch(e){} pushChecked=true; renderAlerts(); }
+  async function pushEnable(){ const perm=await Notification.requestPermission(); if(perm!=='granted') throw new Error('Notifications are blocked for Mat Time. Allow them in the iPhone Settings app, under Notifications, Mat Time.');
+    const reg=await navigator.serviceWorker.ready; const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64url(VAPID)}); const r=await pushCall({action:'subscribe',sub:sub.toJSON()}); if(!r||!r.ok) throw new Error((r&&r.error)||'could not save'); pushSub=sub; }
+  // Alerts panel: says in plain words whether a GO NOW alert can reach THIS phone, and lets anyone prove it with a test.
   function renderAlerts(){
-    const box=$('alerts'), a=$('alertState'), sub=$('alertSub'); if(!box) return; const tid=todayId(); let cls='', t, d;
+    const box=$('alerts'), a=$('alertState'), sub=$('alertSub'), btn=$('alertTest'); if(!box) return; const tid=todayId(); let cls='', t, d, bl='Send test alert';
     const srv=pushDoc[MEET.id+'|go']; let loc=null; try{ loc=+localStorage.getItem('mt.go.'+MEET.id+'|'+$('track').value)||null; }catch(e){}
-    const server=!!(hb&&hb.v>=3);
-    if(!db||!cfgOk){ t='Alerts: checking…'; d=''; cls='idle'; }
-    else if(!window.MT_NTFY){ t='Alerts are off'; d='No alert channel is set up, so no phone will buzz.'; cls='off'; }
-    else if(MEET.id<tid){ t='Past meet'; d='No alerts for a meet that is over.'; cls='idle'; }
-    else if(srv||(loc&&loc>1)){ t='GO NOW alert sent '+clock((srv&&srv.ms)||loc); d='Sent once per meet. Use the test button to check your phone.'; }
-    else { t=MEET.id===tid?'Alerts are armed':'Alerts armed for '+dateLbl(MEET.id); d=server?'GO NOW buzzes your phone even when this page is closed.':'GO NOW buzzes your phone while this page is open on at least one phone.'; }
-    if(a.textContent!==t) a.textContent=t; if(!sub.dataset.hold&&sub.textContent!==d) sub.textContent=d; box.className='alerts'+(cls?' '+cls:'');
+        if(!pushChecked){ t='Alerts: checking…'; d=''; cls='idle'; }
+    else if(!pushOK()){ t='Alerts need the Home Screen app'; d='On iPhone: Share, Add to Home Screen, then open Mat Time from that icon and turn alerts on.'; cls='off'; bl='How to'; }
+    else if(!pushSub){ t='Alerts are off on this phone'; d='Turn them on once and GO NOW will buzz this phone, even with the app closed.'; cls='off'; bl='Turn on alerts'; }
+    else if(MEET.id>=tid&&(srv||(loc&&loc>1))){ t='GO NOW alert sent '+clock((srv&&srv.ms)||loc); d='Sent once per meet. Use the test button to check this phone.'; }
+    else { t='Alerts are on for this phone'; d='GO NOW will buzz this phone, even with the app closed. Keep the phone off silent.'; }
+    if(a.textContent!==t) a.textContent=t; if(!sub.dataset.hold&&sub.textContent!==d) sub.textContent=d; if(btn.textContent!==bl&&!btn.disabled) btn.textContent=bl; box.className='alerts'+(cls?' '+cls:'');
   }
-  $('alertTest').addEventListener('click',async()=>{ const b=$('alertTest'), sub=$('alertSub'); if(!window.MT_NTFY){ toast('No alert channel set up'); return; }
-    b.disabled=true; sub.dataset.hold='1'; sub.textContent='Sending test…'; let msg;
-    try{ const r=await fetch('https://ntfy.sh/'+window.MT_NTFY,{method:'POST',headers:{'Title':'Mat Time test','Tags':'white_check_mark'},body:'Test alert sent '+clock(Date.now())+'. GO NOW will arrive the same way.'}); msg=r.ok?'Test sent '+clock(Date.now())+'. Your phone should buzz within a few seconds.':'Test failed ('+r.status+'). Try again.'; }
-    catch(e){ msg='Test failed: no connection.'; }
-    sub.textContent=msg; b.disabled=false; setTimeout(()=>{ delete sub.dataset.hold; renderAlerts(); },15000); });
+  $('alertTest').addEventListener('click',async()=>{ const b=$('alertTest'), sub=$('alertSub'); if(!pushOK()){ toast('Add Mat Time to the Home Screen first'); return; }
+    b.disabled=true; sub.dataset.hold='1'; let msg;
+    try{ if(!pushSub){ sub.textContent='Turning alerts on…'; await pushEnable(); }
+      sub.textContent='Sending test…'; const r=await pushCall({action:'test',endpoint:pushSub.endpoint});
+      msg=r&&r.ok?'Test sent '+clock(Date.now())+'. This phone should buzz within a few seconds.':'Test failed: '+((r&&(r.error||r.err))||'not delivered')+'. Tap again.'; if(r&&r.gone){ pushSub=null; } }
+    catch(e){ msg=e&&e.message?e.message:'Could not turn alerts on.'; }
+    sub.textContent=msg; b.disabled=false; setTimeout(()=>{ delete sub.dataset.hold; renderAlerts(); },15000); renderAlerts(); });
+  setTimeout(pushInit,0);
   $('emptyAdd').addEventListener('click',()=>openNewMeet(MEET.id));
   function renderAll(){ project(); try{ goCheck(); }catch(e){} try{ renderAlerts(); const none=!MIDS().some(m=>flat(m).length); $('empty').hidden=!none; document.querySelector('.cards').hidden=none; $('tabs').hidden=none; $('sheet').hidden=none; }catch(e){} [...document.querySelectorAll('.cards .card')].forEach(c=>{ if(!MATS[c.id.slice(5)]) c.remove(); }); MIDS().forEach(renderCard); renderTabs(); renderWork(); renderSheet(); recordSummary(); }
 
@@ -927,5 +939,5 @@ window.MT_DB=(function(){
 })();
 </script>
 
-<div style="text-align:center;font-size:11px;opacity:.5;padding:8px">build Nov 23 11:14 AM</div>
+<div style="text-align:center;font-size:11px;opacity:.5;padding:8px">build Nov 23 12:17 PM</div>
 </body></html>
